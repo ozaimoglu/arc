@@ -24,10 +24,6 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 
 ## A library that feels like yours
 
-<img src="docs/assets/library-illustration.png" alt="Illustrated Arc library: cinematic hero, portrait covers and colored Metacritic/Steam scores" width="1440" />
-
-*Illustrated preview with original sample artwork and scores. Your installed games and chosen artwork populate the actual app.*
-
 | Feature | What you get |
 | --- | --- |
 | **Find your games** | Recursive folder discovery, Windows EXE metadata and confidence-based filtering of installers, crash handlers and support binaries. |

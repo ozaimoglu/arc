@@ -20,7 +20,7 @@ Existing regressions cover missing versus zero scores, correct per-scale colors,
 - The current-user application has been installed and started on Windows with a responding Arc window and system WebView2.
 - Existing library, settings, sessions, exclusions and rating/cache records were preserved through the branding upgrade. SQLite integrity and foreign-key checks passed with schema version 3.
 - All seven icon sizes (16–256px) were decoded and visually reviewed. Their image bytes are embedded in the Windows executable. SVG/PNG branding uses shared geometry and transparent backgrounds/corners.
-- README artwork is original, labeled illustration content. It is not evidence of a captured native app window.
+- The README brand poster uses original Eclipse artwork. Native application screenshots have not been captured; the poster does not establish visual UI validation.
 
 ## Limits
 

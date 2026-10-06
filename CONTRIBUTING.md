@@ -48,6 +48,6 @@ The x64 setup file is written to `src-tauri/target/release/bundle/nsis/`. `npm r
 
 ## Brand assets
 
-With Python Pillow installed, run `python scripts/generate-icons.py` to regenerate logo/icon exports. Run `python scripts/generate-readme-assets.py` for the original README illustrations. Both use editable SVG geometry and the installed Tauri renderer. See [branding](docs/BRANDING.md).
+With Python Pillow installed, run `python scripts/generate-icons.py` to regenerate logo/icon exports. Run `python scripts/generate-readme-assets.py` for the README brand poster. Both use editable SVG geometry and the installed Tauri renderer. See [branding](docs/BRANDING.md).
 
 Contributions are provided under the repository's [MIT license](LICENSE). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
