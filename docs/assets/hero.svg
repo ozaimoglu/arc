@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 840" font-family="Segoe UI, Arial, sans-serif"><rect x="0" y="0" width="1600" height="840" rx="0" fill="#101012" stroke="none"/><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 392 128" fill="none" x="84" y="45" width="250" height="82">
+  <defs>
+    <linearGradient id="arc-orbit" x1="20" y1="69" x2="97" y2="17" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9d642e" />
+      <stop offset=".46" stop-color="#ffc778" />
+      <stop offset="1" stop-color="#fff0cb" />
+    </linearGradient>
+    <linearGradient id="arc-left" x1="43" y1="30" x2="52" y2="101" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0" />
+      <stop offset=".48" stop-color="#e6e6e5" />
+      <stop offset="1" stop-color="#b9bfc9" />
+    </linearGradient>
+    <linearGradient id="arc-right" x1="67" y1="32" x2="99" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f2f0e9" />
+      <stop offset=".46" stop-color="#adb5c4" />
+      <stop offset="1" stop-color="#626d83" />
+    </linearGradient>
+    <linearGradient id="arc-bar" x1="42" y1="79" x2="84" y2="94" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0" />
+      <stop offset="1" stop-color="#c3c8d2" />
+    </linearGradient>
+  </defs>
+  <path d="M16 77C9 48 25 19 53 13C77 8 100 19 111 40C98 26 81 19 62 22C39 25 23 43 20 64Z" fill="url(#arc-orbit)" />
+  <path d="M24 101L58 34C60 30 64 27 68 29L76 34L47 101Z" fill="url(#arc-left)" />
+  <path d="M68 29L107 101H84L58 47Z" fill="url(#arc-right)" />
+  <path d="M48 79H79L86 94H41Z" fill="url(#arc-bar)" />
+  <path d="M24 101L58 34C60 30 64 27 68 29L66 33L32 101Z" fill="#fffaf0" fill-opacity=".38" />
+  <g transform="translate(150 28)" fill="#ece7de">
+    <path d="M0 64L27 8H41L68 64H53L34 24L15 64ZM22 46H46L51 58H17Z" />
+    <path fill-rule="evenodd" d="M85 8H119C138 8 146 18 146 32C146 42 140 49 132 52L149 64H130L111 49H99V64H85ZM99 21V36H119C126 36 131 33 131 28C131 23 126 21 119 21Z" />
+    <path d="M229 13L222 26C215 22 210 20 203 20C187 20 179 26 179 36C179 46 187 53 203 53C212 53 218 50 223 46L231 58C224 63 214 67 203 67C179 67 164 55 164 36C164 17 179 6 203 6C213 6 222 9 229 13Z" />
+  </g>
+</svg><text x="1194" y="92" fill="#a5a5ae" font-size="18" font-weight="500" letter-spacing="2">WINDOWS X64 / TAURI 2</text><text x="92" y="274" fill="#ece7de" font-size="96" font-weight="650" letter-spacing="-4">Your games.</text><text x="92" y="376" fill="#ece7de" font-size="96" font-weight="650" letter-spacing="-4">One cinematic</text><text x="92" y="478" fill="#ffd08b" font-size="96" font-weight="650" letter-spacing="-4">library.</text><text x="96" y="556" fill="#b9b9c1" font-size="26" font-weight="400" letter-spacing="0">Discover your installations. Curate the artwork.</text><text x="96" y="598" fill="#b9b9c1" font-size="26" font-weight="400" letter-spacing="0">Bring PC and shadPS4 games into one local library.</text><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" x="1025" y="162" width="458" height="458">
+  <defs>
+    <linearGradient id="arc-orbit" x1="20" y1="69" x2="97" y2="17" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9d642e" />
+      <stop offset=".46" stop-color="#ffc778" />
+      <stop offset="1" stop-color="#fff0cb" />
+    </linearGradient>
+    <linearGradient id="arc-left" x1="43" y1="30" x2="52" y2="101" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0" />
+      <stop offset=".48" stop-color="#e6e6e5" />
+      <stop offset="1" stop-color="#b9bfc9" />
+    </linearGradient>
+    <linearGradient id="arc-right" x1="67" y1="32" x2="99" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f2f0e9" />
+      <stop offset=".46" stop-color="#adb5c4" />
+      <stop offset="1" stop-color="#626d83" />
+    </linearGradient>
+    <linearGradient id="arc-bar" x1="42" y1="79" x2="84" y2="94" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0" />
+      <stop offset="1" stop-color="#c3c8d2" />
+    </linearGradient>
+    <linearGradient id="arc-tile" x1="16" y1="4" x2="112" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#292a30" />
+      <stop offset=".55" stop-color="#17191f" />
+      <stop offset="1" stop-color="#0b0c10" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="28" fill="url(#arc-tile)" stroke="#ffffff" stroke-opacity=".12" />
+  <path d="M16 77C9 48 25 19 53 13C77 8 100 19 111 40C98 26 81 19 62 22C39 25 23 43 20 64Z" fill="url(#arc-orbit)" />
+  <path d="M24 101L58 34C60 30 64 27 68 29L76 34L47 101Z" fill="url(#arc-left)" />
+  <path d="M68 29L107 101H84L58 47Z" fill="url(#arc-right)" />
+  <path d="M48 79H79L86 94H41Z" fill="url(#arc-bar)" />
+  <path d="M24 101L58 34C60 30 64 27 68 29L66 33L32 101Z" fill="#fffaf0" fill-opacity=".38" />
+</svg><path d="M92 697H1508" stroke="#303036"/><text x="92" y="759" fill="#ece7de" font-size="24" font-weight="600" letter-spacing="0">Local library</text><text x="92" y="801" fill="#a5a5ae" font-size="18" font-weight="400" letter-spacing="0">SQLite + offline cache</text><text x="455" y="759" fill="#ece7de" font-size="24" font-weight="600" letter-spacing="0">Artwork you choose</text><text x="455" y="801" fill="#a5a5ae" font-size="18" font-weight="400" letter-spacing="0">Covers, heroes and logos</text><text x="825" y="759" fill="#ece7de" font-size="24" font-weight="600" letter-spacing="0">Scores at a glance</text><text x="825" y="801" fill="#a5a5ae" font-size="18" font-weight="400" letter-spacing="0">Metacritic + Steam</text><text x="1190" y="759" fill="#ece7de" font-size="24" font-weight="600" letter-spacing="0">Open to build on</text><text x="1190" y="801" fill="#a5a5ae" font-size="18" font-weight="400" letter-spacing="0">Rust + React + MIT</text></svg>

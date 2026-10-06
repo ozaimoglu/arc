@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Library window: core event and asset access. Native operations use constrained Rust commands.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Arc",
+  "version": "0.1.8",
+  "identifier": "com.arc.launcher",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{ "label": "main", "title": "Arc", "width": 1440, "height": 960, "minWidth": 760, "minHeight": 600, "center": true, "backgroundColor": "#101012", "theme": "Dark" }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' asset: http://asset.localhost https://cdn2.steamgriddb.com https://cdn.steamgriddb.com data: blob:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'",
+      "assetProtocol": { "enable": true, "scope": ["$APPLOCALDATA/covers/**", "$APPLOCALDATA/heroes/**", "$APPLOCALDATA/logos/**"] }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "category": "Entertainment",
+    "shortDescription": "Your games, together.",
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" }, "nsis": { "installMode": "currentUser", "startMenuFolder": "Arc Launcher", "installerIcon": "icons/icon.ico", "uninstallerIcon": "icons/icon.ico" }, "wix": { "language": "en-US" } }
+  }
+}

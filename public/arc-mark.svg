@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="arc-orbit" x1="20" y1="69" x2="97" y2="17" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9d642e"/><stop offset=".46" stop-color="#ffc778"/><stop offset="1" stop-color="#fff0cb"/>
+    </linearGradient>
+    <linearGradient id="arc-left" x1="43" y1="30" x2="52" y2="101" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0"/><stop offset=".48" stop-color="#e6e6e5"/><stop offset="1" stop-color="#b9bfc9"/>
+    </linearGradient>
+    <linearGradient id="arc-right" x1="67" y1="32" x2="99" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f2f0e9"/><stop offset=".46" stop-color="#adb5c4"/><stop offset="1" stop-color="#626d83"/>
+    </linearGradient>
+    <linearGradient id="arc-bar" x1="42" y1="79" x2="84" y2="94" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0"/><stop offset="1" stop-color="#c3c8d2"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 77C9 48 25 19 53 13C77 8 100 19 111 40C98 26 81 19 62 22C39 25 23 43 20 64Z" fill="url(#arc-orbit)"/>
+  <path d="M24 101L58 34C60 30 64 27 68 29L76 34L47 101Z" fill="url(#arc-left)"/>
+  <path d="M68 29L107 101H84L58 47Z" fill="url(#arc-right)"/>
+  <path d="M48 79H79L86 94H41Z" fill="url(#arc-bar)"/>
+  <path d="M24 101L58 34C60 30 64 27 68 29L66 33L32 101Z" fill="#fffaf0" fill-opacity=".38"/>
+</svg>

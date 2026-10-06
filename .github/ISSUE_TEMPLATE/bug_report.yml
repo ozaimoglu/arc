@@ -1,0 +1,37 @@
+name: Bug report
+description: A reproducible problem with scanning, ratings, artwork or the interface.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Arc version and Windows version
+      placeholder: Arc 0.1.8, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, what happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant details
+      description: Screenshots, a minimal folder layout, or a rating source URL. Remove API keys and personal paths.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Game detection
+        - Ratings or game matching
+        - Artwork
+        - Launching or shadPS4
+        - Interface or accessibility
+        - Installation or build
+    validations:
+      required: true
