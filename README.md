@@ -24,6 +24,10 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 
 ## A library that feels like yours
 
+<img src="docs/assets/arc-library.png" alt="Arc running on Windows: Bloodborne hero, Play button and installed games in a portrait cover grid" width="1440" />
+
+*Arc 0.1.8 on Windows, showing an installed library with Bloodborne as the featured game.*
+
 | Feature | What you get |
 | --- | --- |
 | **Find your games** | Recursive folder discovery, Windows EXE metadata and confidence-based filtering of installers, crash handlers and support binaries. |

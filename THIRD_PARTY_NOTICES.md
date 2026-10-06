@@ -6,5 +6,6 @@ Arc's application code and original Eclipse brand assets are licensed under MIT;
 - **Tauri, Rust crates, React, Vite and Lucide:** versions are recorded in Cargo/npm manifests and lockfiles. Consult their package distributions for license notices. Lucide supplies interface icons; the Arc logo is an original vector asset.
 - **Steam, Metacritic and SteamGridDB:** independently operated data/artwork services. Their names, marks, game artwork and review content belong to their respective owners. Arc is not affiliated with or endorsed by these services.
 - **README brand poster:** original Eclipse vector artwork, included under Arc's MIT license. It presents Arc's identity and is not an application screenshot.
+- **Application screenshot:** `docs/assets/arc-library.png` shows the maintainer's installed library. The game artwork, titles and logos visible in it belong to their respective owners and are not covered by Arc's MIT license.
 
-Arc does not include games, ROMs, PS4 firmware, copyrighted game assets or the shadPS4 emulator. Users supply their own installations.
+Arc does not bundle games, ROMs, PS4 firmware, game data or the shadPS4 emulator. Users supply their own installations.

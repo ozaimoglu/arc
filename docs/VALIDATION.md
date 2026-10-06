@@ -20,7 +20,8 @@ Existing regressions cover missing versus zero scores, correct per-scale colors,
 - The current-user application has been installed and started on Windows with a responding Arc window and system WebView2.
 - Existing library, settings, sessions, exclusions and rating/cache records were preserved through the branding upgrade. SQLite integrity and foreign-key checks passed with schema version 3.
 - All seven icon sizes (16–256px) were decoded and visually reviewed. Their image bytes are embedded in the Windows executable. SVG/PNG branding uses shared geometry and transparent backgrounds/corners.
-- The README brand poster uses original Eclipse artwork. Native application screenshots have not been captured; the poster does not establish visual UI validation.
+- A maintainer-supplied [screenshot of the installed Windows library](assets/arc-library.png) was visually reviewed and included unchanged in the README. It shows the Bloodborne hero and the cover grid; it does not establish interactive UI coverage.
+- The README brand poster uses original Eclipse artwork and is separate from the application screenshot.
 
 ## Limits
 
