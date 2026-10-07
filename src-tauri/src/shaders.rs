@@ -136,28 +136,59 @@ fn game_status(game: &Game) -> Result<Option<GameStatus>> {
     read_json(&data_dir()?.join("games.json"))?.map(|list| status_from_list(&list, &game.exe_path)).transpose().map(Option::flatten)
 }
 
+fn install_root(game: &Game) -> Result<PathBuf> {
+    let folder = fs::canonicalize(&game.folder).map_err(|e| e.to_string())?;
+    let exe = fs::canonicalize(&game.exe_path).map_err(|e| e.to_string())?;
+    let directory = exe.parent().ok_or("The game executable has no directory.")?;
+    let mut candidate = folder.clone();
+    if let Some(parent) = directory.parent() {
+        if parent.file_name().is_some_and(|name| name.eq_ignore_ascii_case("Binaries")) {
+            if let Some(project) = parent.parent() {
+                candidate = project.parent().filter(|above| above.join("Engine").is_dir()).unwrap_or(project).to_path_buf();
+            }
+        } else if parent.file_name().is_some_and(|name| name.eq_ignore_ascii_case("bin")) {
+            if let Some(root) = parent.parent() { candidate = root.to_path_buf(); }
+        } else if directory.file_name().is_some_and(|name| name.to_string_lossy().to_ascii_lowercase().starts_with("bin")) {
+            candidate = parent.to_path_buf();
+        }
+    }
+    // An outer library/delivery folder is not necessarily the engine's install root.
+    // Narrow known layouts, but never expand the scan beyond Arc's existing game folder.
+    let root_key = path_key(&models::path_string(&candidate));
+    let folder_key = path_key(&models::path_string(&folder));
+    if candidate.is_dir() && (root_key == folder_key || root_key.starts_with(&format!("{folder_key}\\"))) { Ok(candidate) } else { Ok(folder) }
+}
+
 fn merge_manual(list: &mut Value, game: &Game) -> Result<bool> {
     let entries = list.as_array_mut().ok_or("The SCSKiller manual game list is invalid; it was left unchanged.")?;
-    if entries.iter().any(|entry| entry.get("Exe").and_then(Value::as_str).is_some_and(|exe| path_key(exe) == path_key(&game.exe_path))) { return Ok(false); }
+    let root = models::path_string(&install_root(game)?);
+    if let Some(entry) = entries.iter_mut().find(|entry| entry.get("Exe").and_then(Value::as_str).is_some_and(|exe| path_key(exe) == path_key(&game.exe_path))) {
+        if entry.get("Confirmed").and_then(Value::as_bool) == Some(true) || entry.get("InstallDir").and_then(Value::as_str).is_some_and(|folder| path_key(folder) == path_key(&root)) { return Ok(false); }
+        let Some(previous) = entry.get("InstallDir").and_then(Value::as_str) else { return Ok(false); };
+        if !path_key(&root).starts_with(&format!("{}\\", path_key(previous))) { return Ok(false); }
+        entry.as_object_mut().ok_or("The manual game entry is invalid.")?.insert("InstallDir".into(), json!(root));
+        return Ok(true);
+    }
     // Unconfirmed roots deliberately keep SCSKiller's recorder disabled for newly imported games.
     entries.push(json!({"Exe": models::path_string(&fs::canonicalize(&game.exe_path).map_err(|e| e.to_string())?),
-        "InstallDir": models::path_string(&fs::canonicalize(&game.folder).map_err(|e| e.to_string())?), "Name": game.title, "Confirmed": false}));
+        "InstallDir": root, "Name": game.title, "Confirmed": false}));
     Ok(true)
 }
 
-fn ensure_manual(game: &Game) -> Result<()> {
-    if game_status(game)?.is_some() { return Ok(()); }
+fn ensure_manual(game: &Game) -> Result<bool> {
+    if game_status(game)?.is_some_and(|status| !status.id.starts_with("manual:")) { return Ok(false); }
     let dir = data_dir()?; fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let _lock = ManualLock::acquire(&dir)?;
     let path = dir.join("manual-games.json");
     let mut list = read_json(&path)?.unwrap_or_else(|| json!([]));
-    if !merge_manual(&mut list, game)? { return Ok(()); }
+    if !merge_manual(&mut list, game)? { return Ok(false); }
     if path.is_file() { fs::copy(&path, dir.join("manual-games.arc-backup.json")).map_err(|e| e.to_string())?; }
     let temporary = dir.join(format!("manual-games.arc-{}.tmp", std::process::id()));
     let bytes = serde_json::to_vec_pretty(&list).map_err(|e| e.to_string())?;
     let mut file = fs::File::create(&temporary).map_err(|e| e.to_string())?;
     file.write_all(&bytes).and_then(|_| file.sync_all()).map_err(|e| e.to_string())?; drop(file);
-    fs::rename(&temporary, path).map_err(|e| e.to_string())
+    fs::rename(&temporary, path).map_err(|e| e.to_string())?;
+    Ok(true)
 }
 
 // SCSKiller's documented manual-game JSON is updated under its cross-process Windows mutex.
@@ -272,11 +303,13 @@ fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action, imported:
             return Err("The queue finished without a verified preparation timestamp. Analyze again and inspect SCSKiller's output.".into());
         }
     }
-    if action == Action::Analyze && game_status(game)?.is_none() {
-        if imported { return Err("SCSKiller did not recognize this executable. Only native x64 DirectX games are supported.".into()); }
-        // Discover store entries first; importing before discovery would create duplicate store/manual identities.
-        ensure_manual(game)?;
-        return execute(manager, cli, game, action, true);
+    if action == Action::Analyze {
+        let status = game_status(game)?;
+        // Discover store entries first; then repair a suggested manual root or add the missing executable.
+        if !imported && (status.is_none() || status.as_ref().is_some_and(|status| status.id.starts_with("manual:"))) && ensure_manual(game)? {
+            return execute(manager, cli, game, action, true);
+        }
+        if status.is_none() { return Err("SCSKiller did not recognize this executable. Only native x64 DirectX games are supported.".into()); }
     }
     Ok(())
 }
@@ -384,6 +417,37 @@ mod tests {
         let mut list = json!([{"UnknownEntry": true}]); assert!(merge_manual(&mut list, &game).unwrap());
         assert_eq!(list[0], json!({"UnknownEntry": true})); assert_eq!(list[1]["Confirmed"], false); assert_eq!(list[1]["Name"], game.title);
         assert!(merge_manual(&mut json!({}), &game).is_err()); fs::remove_dir_all(dir).unwrap();
+    }
+    #[test] fn nested_engine_layouts_use_the_game_root_inside_the_library_folder() {
+        let (dir, mut game) = fixture();
+        let root = dir.join("Delivered/Game");
+        let exe = root.join("bin/x64_dx12/Game.exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap(); fs::write(&exe, b"fixture").unwrap();
+        game.exe_path = models::path_string(&exe);
+        assert_eq!(install_root(&game).unwrap(), fs::canonicalize(&root).unwrap());
+        let mut list = json!([]); merge_manual(&mut list, &game).unwrap();
+        assert_eq!(path_key(list[0]["InstallDir"].as_str().unwrap()), path_key(&models::path_string(&root)));
+        let unreal = root.join("Project/Binaries/Win64/Game.exe");
+        fs::create_dir_all(unreal.parent().unwrap()).unwrap(); fs::create_dir(root.join("Engine")).unwrap(); fs::write(&unreal, b"fixture").unwrap();
+        game.exe_path = models::path_string(&unreal);
+        assert_eq!(install_root(&game).unwrap(), fs::canonicalize(&root).unwrap());
+        game.folder = models::path_string(&root.join("Project"));
+        assert_eq!(install_root(&game).unwrap(), fs::canonicalize(root.join("Project")).unwrap());
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[test] fn repairing_an_unconfirmed_root_preserves_the_users_metadata() {
+        let (dir, mut game) = fixture(); let root = dir.join("Game"); let exe = root.join("bin/x64/Game.exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap(); fs::write(&exe, b"fixture").unwrap(); game.exe_path = models::path_string(&exe);
+        let mut list = json!([{"Exe": game.exe_path, "InstallDir": game.folder, "Name": "Personal title", "Confirmed": false, "FutureField": 42}]);
+        assert!(merge_manual(&mut list, &game).unwrap());
+        assert_eq!(list[0]["Name"], "Personal title"); assert_eq!(list[0]["Confirmed"], false); assert_eq!(list[0]["FutureField"], 42);
+        assert_eq!(path_key(list[0]["InstallDir"].as_str().unwrap()), path_key(&models::path_string(&root)));
+        assert!(!merge_manual(&mut list, &game).unwrap());
+        list[0]["InstallDir"] = json!(models::path_string(&root.join("bin"))); let narrower = list.clone();
+        assert!(!merge_manual(&mut list, &game).unwrap()); assert_eq!(list, narrower);
+        list[0]["InstallDir"] = json!(game.folder); list[0]["Confirmed"] = json!(true); let before = list.clone();
+        assert!(!merge_manual(&mut list, &game).unwrap()); assert_eq!(list, before);
+        fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn bounded_json_accepts_bom_and_refuses_corruption() {
         let (dir, _) = fixture(); let path = dir.join("cache.json");

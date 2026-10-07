@@ -47,6 +47,7 @@ export default function ShaderTools({ game, onConfigure }: { game: Game; onConfi
   if (game.consoleLaunch) return <section className="shader-tools"><h2>Shader preparation</h2><p className="field-help">SCSKiller prepares native PC DirectX shaders. shadPS4 manages its own shader cache.</p></section>;
   if (!isDesktop) return <section className="shader-tools"><h2>Shader preparation</h2><p className="field-help">SCSKiller integration is available in the Windows app.</p></section>;
   const status = snapshot?.game;
+  const needsFolderConfirmation = status?.status === 'Unsupported' && status.reason.includes('once you confirm its game folder');
   const locked = pending || !snapshot || snapshot.busy || !game.available;
   return <section className="shader-tools" aria-labelledby="shader-heading">
     <div className="shader-heading"><h2 id="shader-heading"><Cpu size={18} aria-hidden="true" /> Shader preparation</h2><span className="shader-provider">SCSKiller</span></div>
@@ -54,11 +55,12 @@ export default function ShaderTools({ game, onConfigure }: { game: Game; onConfi
       <p className="field-help">Prepare supported game shaders before you play. Connect your SCSKiller installation to get started.</p>
       <button className="secondary-button" onClick={onConfigure}>Connect SCSKiller <ArrowUpRight size={15} aria-hidden="true" /></button>
     </> : <>
-      <div className={`shader-status ${status?.status === 'Warmed' ? 'prepared' : ''}`}><span>{status ? labels[status.status] ?? 'Analyze again' : 'Not analyzed'}</span>{status?.engine && <small>{[status.engine, status.graphicsApi].filter(Boolean).join(' · ')}</small>}</div>
+      <div className={`shader-status ${status?.status === 'Warmed' ? 'prepared' : ''}`}><span>{needsFolderConfirmation ? 'Folder confirmation needed' : status ? labels[status.status] ?? 'Analyze again' : 'Not analyzed'}</span>{status?.engine && <small>{[status.engine, status.graphicsApi].filter(Boolean).join(' · ')}</small>}</div>
       <p className="field-help">{status?.reason ?? 'Analyze this installation to check shader support. Arc adds its local executable to SCSKiller when needed.'}</p>
       {snapshot.warning && <p className="form-error" role="alert">{snapshot.warning}</p>}
       {status?.warmedAt && <p className="shader-last">Last prepared {new Date(status.warmedAt).toLocaleString()}{status.driver ? ` · Driver ${status.driver}` : ''}</p>}
       {status?.status === 'NeedsRecording' && <p className="field-help">Create a recording in SCSKiller, then analyze again. Arc does not install a recorder or bypass anti-cheat.</p>}
+      {needsFolderConfirmation && <p className="field-help">Confirm this game’s folder in SCSKiller, then create a recording and analyze again.</p>}
       <div className="shader-actions"><button className="secondary-button" disabled={locked} onClick={() => void start('analyze')}><RefreshCw size={15} aria-hidden="true" /> {status ? 'Analyze again' : 'Analyze game'}</button><button className="primary-button" disabled={locked || !status?.canCompile} onClick={() => void start('compile')}><Cpu size={16} aria-hidden="true" /> {status?.status === 'Warmed' ? 'Recompile shaders' : 'Compile shaders'}</button></div>
       {!game.available && <p className="field-help">Restore this game’s installation before analyzing.</p>}
     </>}

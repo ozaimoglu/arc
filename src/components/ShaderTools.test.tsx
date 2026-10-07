@@ -27,6 +27,12 @@ it('keeps recording-required games disabled and shows the actual reason', async 
   snapshot.game = { id: 'steam:1', status: 'NeedsRecording', reason: 'This engine needs a recording.', engine: 'Unreal', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: null, warmedAt: null, driver: null, canCompile: false };
   await render(); expect(host.textContent).toContain('This engine needs a recording.'); expect(button('Compile shaders').disabled).toBe(true);
 });
+it('distinguishes an unconfirmed recording folder from unsupported shader formats', async () => {
+  snapshot.game = { id: 'manual:abc', status: 'Unsupported', reason: 'needs a recording, once you confirm its game folder', engine: 'Carved', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: null, warmedAt: null, driver: null, canCompile: false };
+  await render(); expect(host.textContent).toContain('Folder confirmation needed');
+  expect(host.textContent).toContain('Confirm this game’s folder in SCSKiller'); expect(host.textContent).not.toContain('Not supported');
+  expect(button('Compile shaders').disabled).toBe(true);
+});
 it('uses the database id and compile action for a verified ready game', async () => {
   snapshot.game = { id: 'steam:1', status: 'Ready', reason: 'Shader files found.', engine: 'Unreal', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: 120, warmedAt: null, driver: null, canCompile: true };
   await render(); expect(button('Compile shaders').disabled).toBe(false);

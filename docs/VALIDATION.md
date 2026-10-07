@@ -1,5 +1,15 @@
 # Release validation
 
+## v0.1.10 — Shader folder correction (local build)
+
+44 frontend tests and 54 Rust tests passed. Regression coverage now includes nested REDengine/Unreal roots, repair of old unconfirmed metadata, preservation of confirmed and narrower folders, and the folder-confirmation UI state. Clippy and production bundling passed.
+
+A local compatibility audit analyzed 47 native installations without launching games or compiling their shaders. SCSKiller reported 17 ready and one already warmed; three required folder confirmation/recording, three had encrypted shaders, and the remaining 23 reported unsupported formats/readers. Two of those unsupported store entries use a different executable from Arc, so they remain unmatched in Arc. The shadPS4 entry was excluded. Ready is an analysis result, not evidence of successful compilation.
+
+The Witcher 3 previously received an outer delivery folder and fell back to the generic shader reader. After resolving its actual `bin/x64_dx12` installation root, official SCSKiller analysis recognized REDengine 3 and reported ready without recording.
+
+The opt-in native regression test reproduced the old unconfirmed root and verified that Arc repaired it through the official CLI. The final v0.1.10 NSIS package was installed and started with a responding Arc window; its executable matches the built artifact. SQLite integrity, all existing library/settings records and the SCSKiller connection were preserved.
+
 ## v0.1.9 — SCSKiller integration (local build)
 
 The optional CLI integration passed 43 frontend tests and 52 Rust tests, strict TypeScript/Vite bundling, SQLite migration verification and Clippy. Its additional official-CLI smoke test is opt-in rather than a CI game dependency.
