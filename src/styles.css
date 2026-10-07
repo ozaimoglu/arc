@@ -320,6 +320,19 @@ code { font-family: 'Cascadia Code', Consolas, monospace; }
 .shader-output { margin-top: 14px; color: var(--muted); font-size: 12px; }
 .shader-output summary { cursor: pointer; width: fit-content; padding: 6px 0; }
 .shader-output pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; line-height: 1.7; font-size: 11px; }
+.shader-cache-settings { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-top: 18px; background: var(--surface); }
+.shader-cache-settings h3 { font-size: 13px; font-weight: 500; margin: 0; }
+.cache-readings { display: flex; flex-wrap: wrap; gap: 18px 32px; margin: 14px 0 10px; }
+.cache-readings dt { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+.cache-readings dd { margin: 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+.cache-gpu { overflow-wrap: anywhere; }
+.cache-size-controls { display: flex; flex-wrap: wrap; gap: 10px; }
+.cache-size-controls select { flex: 1; min-width: 130px; font-size: 13px; background: #141418; border-color: #36363e; }
+.cache-size-controls .secondary-button { font-size: 12px; }
+.cache-success { color: var(--rating-good); font-size: 12px; line-height: 1.7; margin-top: 12px; }
+.cache-precache { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; line-height: 1.6; cursor: pointer; }
+.cache-precache input { width: 16px; height: 16px; flex-shrink: 0; margin-top: 3px; accent-color: var(--accent); }
+.cache-precache small { display: block; color: var(--muted); font-size: 11px; margin-top: 6px; }
 .spin { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes content-appear { from { opacity: .1; transform: translateY(7px); } to { opacity: 1; transform: none; } }

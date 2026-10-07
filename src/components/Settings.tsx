@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Folder, Plus, Trash2, Eye, EyeOff, ArrowUpRight, Check, Radio } from 'lucide-react';
 import Modal from './Modal';
+import ShaderCacheSettings from './ShaderCacheSettings';
 import { api, isDesktop } from '../bridge';
 import type { Settings as SettingsType } from '../types';
 
@@ -42,6 +43,7 @@ export default function Settings({ settings, onClose, onSave }: { settings: Sett
     <input id="shader-tool" readOnly value={draft.shaderTool ?? ''} placeholder="Optional · choose your SCSKiller installation" />
     <div className="shader-settings-actions"><button className="secondary-button" disabled={!isDesktop} onClick={() => void chooseShaderTool()}><Folder size={16} aria-hidden="true" /> Choose SCSKiller</button>{draft.shaderTool && <button className="text-button" onClick={() => setDraft({ ...draft, shaderTool: '' })}>Reset</button>}</div>
     <p className="field-help">Use the official SCSKiller app or portable folder. Analyze and compile native DirectX games from their detail page. Recording stays in SCSKiller.</p>
+    <ShaderCacheSettings connectionChanged={(draft.shaderTool ?? '') !== (settings.shaderTool ?? '')} />
     <label className="toggle-row"><span><Radio size={18} /><span>Keep my library up to date<small>Watch added folders for new and removed games.</small></span></span><input type="checkbox" checked={draft.autoWatch} onChange={event => setDraft({ ...draft, autoWatch: event.target.checked })} /><span className="switch" /></label>
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="modal-footer"><button className="text-button" onClick={onClose}>Cancel</button><button className="primary-button" onClick={() => void submit()} disabled={busy}>{busy ? 'Saving…' : <><Check size={17} /> Save changes</>}</button></div>

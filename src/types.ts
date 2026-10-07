@@ -35,10 +35,12 @@ export interface ShaderGameStatus {
   antiCheat: string; shaderCount: number | null; warmedAt: string | null; driver: string | null; canCompile: boolean;
 }
 export interface ShaderJob {
-  gameId: number; title: string; action: 'analyze' | 'compile'; running: boolean;
+  gameId: number; title: string; action: 'analyze' | 'compile' | 'clearCache'; running: boolean;
   phase: string; lines: string[]; error: string | null; stopped: boolean;
 }
 export interface ShaderSnapshot { installed: boolean; game: ShaderGameStatus | null; job: ShaderJob | null; busy: boolean; warning?: string | null }
+export type ShaderCacheLimit = 'default' | '1' | '5' | '10' | '20' | '50' | '100' | 'unlimited';
+export interface ShaderCacheState { installed: boolean; gpu: string; usage: string; limit: string; selectedLimit: ShaderCacheLimit | null; configurable: boolean; busy: boolean }
 export interface Snapshot { games: Game[]; settings: Settings; runningGameIds: number[] }
 export interface ScanReport { added: number; updated: number; ignored: number; warnings: string[] }
 export type ArtworkKind = 'grid' | 'hero' | 'logo';

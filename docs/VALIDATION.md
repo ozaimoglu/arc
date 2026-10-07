@@ -1,5 +1,13 @@
 # Release validation
 
+## v0.1.11 — Shader cache controls (local build)
+
+57 frontend tests and 59 Rust tests passed, along with strict TypeScript/Vite production bundling, Clippy and the SQLite schema check. Coverage includes explicit cleanup confirmation/cancellation, optional generated precache, exact game identity, unsupported GPU controls, global operation locks, navigation recovery, localized cache sizes, administrator-result validation and failure feedback.
+
+The opt-in read-only Rust query exercised the new adapter against official SCSKiller 1.2.3 on an RTX 4090. It reported the actual 100 GB driver limit and an upper-bound disk reading of 51.5 GB. The official per-game cleanup prompt was also exercised with a negative answer: its three attributed MARVEL SNAP cache files and preparation timestamp remained intact. Driver-setting mutation and actual deletion were not performed during validation; those actions remain explicit user controls. Native screenshot validation was not performed for this update.
+
+The optimized Windows x64 NSIS package was built and installed. Arc restarted as v0.1.11 with a responding window; the installed executable matches the built artifact and contains all three cache IPC commands. SQLite integrity/schema checks passed and every existing library, rating, session, credential and preference record was preserved. Build inputs remained unchanged during packaging.
+
 ## v0.1.10 — Shader folder correction (local build)
 
 44 frontend tests and 54 Rust tests passed. Regression coverage now includes nested REDengine/Unreal roots, repair of old unconfirmed metadata, preservation of confirmed and narrower folders, and the folder-confirmation UI state. Clippy and production bundling passed.

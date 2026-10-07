@@ -22,6 +22,7 @@ Arc is a Windows game library built with Tauri 2.12.1, Rust, React, TypeScript, 
 | `artwork.rs` | SteamGridDB search, conservative match ranking, grid/hero/logo selection and bounded image cache |
 | `ratings.rs` | Provider URL/redirect allowlists, bounded HTTP responses, typed ratings validation, local Steam identity and isolated SQLite rating storage |
 | `shaders.rs` | Optional official SCSKiller CLI, exact executable matching, manual metadata handoff, bounded job output and graceful queue control |
+| `shader_cache.rs` | Actual driver usage/limit queries, elevated NVIDIA size changes and per-game cache cleanup through the official CLI |
 | `src/ratings/` | Bundled CriticPeek 1.5.4 matching/parsers/queues adapted to Rust transport and PC/PS4 platforms |
 | `secrets.rs` | Windows DPAPI credential encryption for the current Windows user |
 | `watcher.rs` | `notify` Windows filesystem watcher, coalesce change bursts and refresh persisted library |

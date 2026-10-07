@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { demoGames } from '../demo';
 import type { ShaderSnapshot } from '../types';
-const bridge = vi.hoisted(() => ({ shaderState: vi.fn(), startShaderJob: vi.fn(), stopShaderJob: vi.fn() }));
+const bridge = vi.hoisted(() => ({ shaderState: vi.fn(), startShaderJob: vi.fn(), stopShaderJob: vi.fn(), clearShaderCache: vi.fn() }));
 vi.mock('../bridge', () => ({ isDesktop: true, api: bridge }));
 import ShaderTools from './ShaderTools';
 let root: Root; let host: HTMLDivElement; let snapshot: ShaderSnapshot;
@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   snapshot = { installed: true, busy: false, job: null, game: null };
   bridge.shaderState.mockImplementation(async () => structuredClone(snapshot));
-  bridge.startShaderJob.mockResolvedValue(undefined); bridge.stopShaderJob.mockResolvedValue(undefined);
+  bridge.startShaderJob.mockResolvedValue(undefined); bridge.stopShaderJob.mockResolvedValue(undefined); bridge.clearShaderCache.mockResolvedValue(undefined);
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
@@ -60,4 +60,41 @@ it('retains an operation error when the next background poll succeeds', async ()
   await render(); await act(async () => button('Analyze game').click());
   await act(async () => vi.advanceTimersByTimeAsync(5000));
   expect(host.textContent).toContain('Close this game first.');
+});
+function readyForCleanup() {
+  snapshot.game = { id: 'steam:999', status: 'Unsupported', reason: 'Packed shader format.', engine: null, graphicsApi: null, antiCheat: 'None', shaderCount: null, warmedAt: null, driver: null, canCompile: false };
+}
+it('requires cleanup confirmation and defaults to preserving game precache', async () => {
+  readyForCleanup(); await render();
+  await act(async () => button('Clear cache').click());
+  expect(bridge.clearShaderCache).not.toHaveBeenCalled();
+  expect(host.querySelector('dialog')?.textContent).toContain(demoGames[0].title);
+  expect(host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+  await act(async () => button('Clear shader cache').click());
+  expect(bridge.clearShaderCache).toHaveBeenCalledWith(1, false);
+  expect(bridge.startShaderJob).not.toHaveBeenCalled();
+});
+it('can opt into generated game precache deletion using the Arc database identity', async () => {
+  readyForCleanup(); await render();
+  await act(async () => button('Clear cache').click());
+  await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async () => button('Clear shader cache').click());
+  expect(bridge.clearShaderCache).toHaveBeenCalledWith(1, true);
+});
+it('cancels cleanup without touching cache files and blocks unverified games', async () => {
+  vi.useFakeTimers();
+  await render(); expect(button('Clear cache').disabled).toBe(true);
+  readyForCleanup(); await act(async () => vi.advanceTimersByTimeAsync(5000));
+  await act(async () => button('Clear cache').click());
+  await act(async () => button('Keep cache').click());
+  expect(host.querySelector('dialog')).toBeNull(); expect(bridge.clearShaderCache).not.toHaveBeenCalled();
+});
+it('recovers cleanup progress across navigation without offering an unsafe Stop', async () => {
+  snapshot.busy = true; snapshot.job = { gameId: 2, title: 'Other game', action: 'clearCache', running: true, phase: 'Clearing', lines: [], error: null, stopped: false };
+  await render(); expect(host.textContent).toContain('Clearing shader cache · Other game');
+  expect(button('Stop')).toBeUndefined(); expect(button('Clear cache').disabled).toBe(true);
+});
+it('shows verified cleanup completion and the refreshed preparation state', async () => {
+  readyForCleanup(); snapshot.job = { gameId: 1, title: demoGames[0].title, action: 'clearCache', running: false, phase: 'CacheCleared', lines: ['cleared Game'], error: null, stopped: false };
+  await render(); expect(host.textContent).toContain('Shader cache cleared'); expect(button('Analyze again').disabled).toBe(false);
 });

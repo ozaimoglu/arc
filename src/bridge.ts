@@ -1,5 +1,5 @@
 import { demoSnapshot } from './demo';
-import type { Artwork, ArtworkKind, Game, GameMatch, GameRatings, ScanReport, Settings, Snapshot, ShaderSnapshot } from './types';
+import type { Artwork, ArtworkKind, Game, GameMatch, GameRatings, ScanReport, Settings, Snapshot, ShaderSnapshot, ShaderCacheState, ShaderCacheLimit } from './types';
 
 type TauriGlobal = { core: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>; convertFileSrc(path: string): string }; event: { listen(event: string, handler: () => void): Promise<() => void> } };
 declare global { interface Window { __TAURI__?: TauriGlobal } }
@@ -43,6 +43,9 @@ export const api = {
   shaderState: (id: number): Promise<ShaderSnapshot> => invoke('shader_state', { id }),
   startShaderJob: (id: number, action: 'analyze' | 'compile'): Promise<void> => invoke('start_shader_job', { id, action }),
   stopShaderJob: (id: number): Promise<void> => invoke('stop_shader_job', { id }),
+  shaderCacheState: (): Promise<ShaderCacheState> => invoke('shader_cache_state'),
+  setShaderCacheLimit: (limit: ShaderCacheLimit): Promise<string> => invoke('set_shader_cache_limit', { limit }),
+  clearShaderCache: (id: number, gamePrecache: boolean): Promise<void> => invoke('clear_shader_cache', { id, gamePrecache }),
   ratingsRequest: (url: string): Promise<{ body: string; status: number; url: string; retryAfter: string | null }> => invoke('ratings_request', { url }),
   ratingCatalogueTitle: (id: number): Promise<string> => invoke('rating_catalogue_title', { id }),
   ratingAppId: (id: number): Promise<number | null> => invoke('get_rating_app_id', { id }),

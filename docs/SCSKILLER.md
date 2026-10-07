@@ -15,15 +15,23 @@ SCSKiller targets NVIDIA/AMD DirectX 12 games and NVIDIA DirectX 11 games. A gam
 
 ## Process and data boundary
 
-Rust runs only the fixed `scan` and `queue` commands with separate process arguments. The frontend supplies an Arc database game ID and an `analyze`/`compile` enum. Compile queue identities come from SCSKiller's local game list and are validated before being sent to stdin; titles and Steam rating IDs never select an installation.
+Rust runs fixed `scan`, `queue`, `cache get`, `cache set` and `cache clear` commands. Arguments are passed separately; the elevated driver-setting action uses the Windows shell's `runas` verb with validated size tokens and a generated result-file path. The frontend supplies an Arc database game ID and typed actions. Compile and cleanup identities come from SCSKiller's local game list and are validated; titles and Steam rating IDs never select an installation.
 
 Arc reads the bounded `%LOCALAPPDATA%\SCSKiller\games.json` snapshot and matches canonical executable paths. Store discovery runs first. If the selected executable is absent, Arc adds only that game to `manual-games.json`, preserving existing entries and unknown fields. This update uses SCSKiller's cross-process named mutex, a backup and an atomic replacement. Newly imported roots are **unconfirmed**, so SCSKiller's recorder is not enabled by the import.
 
 For nested `bin/x64*` and Unreal `Binaries/Win64` layouts, Arc passes the engine's installation root instead of an outer delivery folder. Re-analysis also repairs an older unconfirmed root when the detected root is inside it. Confirmed folders, personal names and unknown metadata remain unchanged. A game awaiting folder confirmation displays **Folder confirmation needed**, with instructions for recording in SCSKiller.
 
-Arc does not invoke recorder installation, offline anti-cheat launches, cache deletion, driver-setting changes or scheduled-task commands. Existing SCSKiller preferences and accounts remain owned by SCSKiller. Its CLI performs its own shader/driver compatibility checks and cache warming. Arc drains stdout/stderr concurrently and retains only the latest 100 output lines.
+Arc does not invoke recorder installation, offline anti-cheat launches or scheduled-task commands. Existing SCSKiller preferences and accounts remain owned by SCSKiller. Its CLI performs its own shader/driver compatibility checks, cache attribution and cache warming. Arc drains stdout/stderr concurrently and retains only the latest 100 output lines.
 
 One operation runs at a time. Analysis has a ten-minute timeout per scan pass. Compilation uses the CLI queue's graceful `stop`/`quit` protocol instead of forcibly killing a warmer. Closing Arc requests the same stop. Driver or game updates are re-evaluated by the next SCSKiller scan/compile rather than inferred from an old successful exit code.
+
+## Cache controls
+
+**Settings → Shader cache** reads the actual GPU driver limit and reported disk usage. NVIDIA cache limits can be set to **Driver default, 1, 5, 10, 20, 50, 100 GB or Unlimited**. Changes apply immediately to the global driver setting for all games, independently of Save changes. Windows requests administrator approval. Arc checks the CLI's result and reads the driver setting again before reporting success. AMD and other GPUs show the measured values without enabling unsupported size changes. SCSKiller's NVIDIA disk reading is an upper bound, which Arc labels **Up to**.
+
+In a native game's details, **Clear cache** asks for confirmation before invoking per-game cleanup. By default it removes only driver and Windows shader-cache files that SCSKiller attributes to the matched executable. The optional checkbox also includes detected generated Unreal user pipeline and shader precache files; shipped shader libraries and saved games are preserved. SCSKiller can refuse cleanup if cache is shared with another game, the game is running or files are in use. Unattributed files may remain.
+
+Cleanup remains available for analyzed games even when their shader format cannot be compiled. It has no Stop control: deletion is allowed to finish, followed by a scan to refresh the preparation state. Arc blocks launching that game during cleanup. Cache-size changes are blocked while a shader operation or an Arc-launched game is running; new launches are blocked while the driver setting is being changed. shadPS4 cache management stays in the emulator.
 
 ## Why compilation may be unavailable
 

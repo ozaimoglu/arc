@@ -12,7 +12,11 @@ const MAX_JSON: u64 = 16 * 1024 * 1024;
 #[derive(Default)]
 pub struct Manager { inner: Mutex<Runtime> }
 #[derive(Default)]
-pub struct Runtime { pub job: Option<Job>, stdin: Option<ChildStdin>, stopping: bool }
+pub struct Runtime { pub job: Option<Job>, pub cache_busy: bool, stdin: Option<ChildStdin>, stopping: bool }
+impl Runtime {
+    pub fn busy(&self) -> bool { self.cache_busy || self.job.as_ref().is_some_and(|job| job.running) }
+    pub(crate) fn begin(&mut self, job: Job) { self.stopping = false; self.stdin = None; self.job = Some(job); }
+}
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +26,7 @@ pub struct Job {
 }
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum Action { Analyze, Compile }
+pub enum Action { Analyze, Compile, ClearCache }
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameStatus {
@@ -36,7 +40,7 @@ pub struct Snapshot { installed: bool, game: Option<GameStatus>, job: Option<Job
 
 impl Manager {
     pub fn lock(&self) -> Result<MutexGuard<'_, Runtime>> { self.inner.lock().map_err(|_| "Shader preparation state is unavailable.".into()) }
-    fn line(&self, line: &str) {
+    pub(crate) fn line(&self, line: &str) {
         if let Ok(mut state) = self.lock() {
             if let Some(job) = &mut state.job {
                 job.lines.push(line.chars().take(1500).collect());
@@ -47,10 +51,13 @@ impl Manager {
     pub fn stop(&self) -> Result<()> {
         self.stop_for(None)
     }
-    fn stop_for(&self, id: Option<i64>) -> Result<()> {
+    pub(crate) fn stop_for(&self, id: Option<i64>) -> Result<()> {
         let mut state = self.lock()?;
         if id.is_some_and(|id| !state.job.as_ref().is_some_and(|job| job.running && job.game_id == id)) { return Err("There is no running shader operation for this game.".into()); }
         if !state.job.as_ref().is_some_and(|job| job.running) { return Ok(()); }
+        if state.job.as_ref().is_some_and(|job| job.action == Action::ClearCache) {
+            return if id.is_some() { Err("Cache cleanup must finish before starting another operation.".into()) } else { Ok(()) };
+        }
         if state.stopping { return Ok(()); }
         state.stopping = true;
         if let Some(job) = &mut state.job { job.phase = "Stopping".into(); }
@@ -76,7 +83,7 @@ pub fn tool_path(selected: &str) -> Result<PathBuf> {
     Ok(cli)
 }
 
-fn configured_tool(selected: &str) -> Result<PathBuf> {
+pub(crate) fn configured_tool(selected: &str) -> Result<PathBuf> {
     if !selected.is_empty() { return tool_path(selected); }
     let local = data_dir()?.parent().unwrap().to_path_buf();
     for folder in [local.join("Programs/SCSKiller/current"), local.join("SCSKiller/current"), local.join("Programs/SCSKiller"), local.join("SCSKiller")] {
@@ -106,7 +113,7 @@ fn path_key(path: &str) -> String {
     let full = fs::canonicalize(path).map(|p| models::path_string(&p)).unwrap_or_else(|_| path.into());
     invariant_upper(full.replace('/', "\\").trim_end_matches('\\'))
 }
-fn valid_id(id: &str) -> bool {
+pub(crate) fn valid_id(id: &str) -> bool {
     id.len() <= 256 && id.split_once(':').is_some_and(|(prefix, name)| !prefix.is_empty() && !name.is_empty() && prefix.bytes().all(|b| b.is_ascii_alphanumeric()))
         && id.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_:./".contains(&b))
 }
@@ -131,7 +138,7 @@ fn status_from_list(list: &Value, exe: &str) -> Result<Option<GameStatus>> {
         driver: entry.get("WarmedDriverVersion").and_then(Value::as_str).map(str::to_owned),
     }))
 }
-fn game_status(game: &Game) -> Result<Option<GameStatus>> {
+pub(crate) fn game_status(game: &Game) -> Result<Option<GameStatus>> {
     if game.console_launch.is_some() { return Ok(None); }
     read_json(&data_dir()?.join("games.json"))?.map(|list| status_from_list(&list, &game.exe_path)).transpose().map(Option::flatten)
 }
@@ -224,7 +231,7 @@ fn queue_stage(line: &str, id: &str) -> Option<&'static str> {
     match words[2] { "Waiting" => Some("Waiting"), "Indexing" => Some("Indexing"), "Planning" => Some("Planning"), "Materializing" => Some("Materializing"), "Warming" => Some("Warming"), "Paused" => Some("Paused"), "Done" => Some("Done"), "Failed" => Some("Failed"), "Stopped" => Some("Stopped"), _ => None }
 }
 
-fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action, imported: bool) -> Result<()> {
+pub(crate) fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action, imported: bool) -> Result<()> {
     launch::plan(game)?;
     let target = if action == Action::Compile {
         let status = game_status(game)?.ok_or("Analyze this game before compiling.")?;
@@ -321,7 +328,7 @@ pub async fn shader_state(state: State<'_, SharedState>, id: i64) -> Result<Snap
         let db = db::open(&state.db_path)?; let game = db::game(&db, id)?;
         let runtime = state.shader.lock()?;
         let job = runtime.job.clone();
-        let busy = runtime.job.as_ref().is_some_and(|job| job.running); drop(runtime);
+        let busy = runtime.busy(); drop(runtime);
         let (game, warning) = match game_status(&game) { Ok(game) => (game, None), Err(error) => (None, Some(error)) };
         Ok(Snapshot { installed: configured_tool(&db::settings(&db)?.shader_tool).is_ok(), game, job, busy, warning })
     }).await.map_err(|e| e.to_string())?
@@ -329,6 +336,7 @@ pub async fn shader_state(state: State<'_, SharedState>, id: i64) -> Result<Snap
 
 #[tauri::command]
 pub async fn start_shader_job(state: State<'_, SharedState>, id: i64, action: Action) -> Result<()> {
+    if action == Action::ClearCache { return Err("Use the cache cleanup action to clear this game's cache.".into()); }
     let state = state.inner().clone();
     let game = db::game(&db::open(&state.db_path)?, id)?;
     if game.console_launch.is_some() { return Err("SCSKiller supports native PC DirectX games, not shadPS4 games.".into()); }
@@ -336,10 +344,9 @@ pub async fn start_shader_job(state: State<'_, SharedState>, id: i64, action: Ac
     launch::plan(&game)?;
     {
         let mut runtime = state.shader.lock()?;
-        if runtime.job.as_ref().is_some_and(|job| job.running) { return Err("Another shader operation is running. Finish or stop it first.".into()); }
+        if runtime.busy() { return Err("Another shader operation is running. Finish or stop it first.".into()); }
         if state.launching.lock().map_err(|_| "Running game state is unavailable.")?.contains(&id) { return Err("Close this game before preparing its shaders.".into()); }
-        runtime.stopping = false; runtime.stdin = None;
-        runtime.job = Some(Job { game_id: id, title: game.title.clone(), action, running: true, phase: "Analyzing".into(), lines: vec![], error: None, stopped: false });
+        runtime.begin(Job { game_id: id, title: game.title.clone(), action, running: true, phase: "Analyzing".into(), lines: vec![], error: None, stopped: false });
     }
     tauri::async_runtime::spawn_blocking(move || {
         let outcome = execute(&state.shader, &cli, &game, action, false);

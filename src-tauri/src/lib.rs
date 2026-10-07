@@ -9,6 +9,7 @@ mod secrets;
 mod watcher;
 mod ratings;
 mod shaders;
+mod shader_cache;
 
 use std::{collections::HashSet, path::{Path, PathBuf}, sync::{Arc, Mutex}};
 use models::{Artwork, GameMatch, GamePatch, ScanReport, Settings, Snapshot};
@@ -237,7 +238,8 @@ async fn launch_game(app: tauri::AppHandle, state: State<'_, SharedState>, id: i
     let state = state.inner().clone();
     {
         let shader = state.shader.lock()?;
-        if shader.job.as_ref().is_some_and(|job| job.running && job.game_id == id) { return Err("Finish or stop shader preparation before launching this game.".into()); }
+        if shader.cache_busy { return Err("Wait for the shader cache limit change to finish before launching a game.".into()); }
+        if shader.job.as_ref().is_some_and(|job| job.running && job.game_id == id) { return Err("Wait for the shader operation to finish before launching this game.".into()); }
         let mut running = state.launching.lock().map_err(|_| "Could not access running games.".to_string())?;
         if !running.insert(id) { return Err("This game is already running.".into()); }
     }
@@ -307,6 +309,6 @@ pub fn run() {
         if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
             if let Some(state) = window.try_state::<SharedState>() { let _ = state.shader.stop(); }
         }
-    }).invoke_handler(tauri::generate_handler![get_library, pick_folder, save_settings, update_game, remove_game, scan_library, search_metadata, link_metadata, get_artworks, set_artwork, import_artwork, open_artwork_site, open_game_folder, launch_game, ratings_request, ratings_cache_read, ratings_cache_write, save_game_ratings, open_rating_source, rating_catalogue_title, get_rating_app_id, shaders::shader_state, shaders::start_shader_job, shaders::stop_shader_job, shaders::pick_shader_tool, shaders::open_shader_site])
+    }).invoke_handler(tauri::generate_handler![get_library, pick_folder, save_settings, update_game, remove_game, scan_library, search_metadata, link_metadata, get_artworks, set_artwork, import_artwork, open_artwork_site, open_game_folder, launch_game, ratings_request, ratings_cache_read, ratings_cache_write, save_game_ratings, open_rating_source, rating_catalogue_title, get_rating_app_id, shaders::shader_state, shaders::start_shader_job, shaders::stop_shader_job, shaders::pick_shader_tool, shaders::open_shader_site, shader_cache::shader_cache_state, shader_cache::set_shader_cache_limit, shader_cache::clear_shader_cache])
     .run(tauri::generate_context!()).expect("Arc could not start");
 }
