@@ -24,5 +24,6 @@ export const demoGames: Game[] = entries.map(([steam, title, genre, playtime, da
 
 export const demoSnapshot: Snapshot = {
   games: demoGames,
+  runningGameIds: [],
   settings: { folders: [], apiKey: '', displayName: 'Player', autoWatch: true },
 };

@@ -61,7 +61,7 @@ fn skip_directory(value: &str) -> bool {
 }
 pub fn blocked(name: &str) -> bool {
     let lower = name.to_lowercase();
-    lower.contains("shadps4") || ["editor.exe", "unrealeditor.exe", "fmeditor.exe", "option.exe", "kscviewer.exe"].contains(&lower.as_str()) || BLACKLIST.iter().any(|word| lower.contains(*word))
+    lower.contains("shadps4") || lower.contains("scskiller") || ["editor.exe", "unrealeditor.exe", "fmeditor.exe", "option.exe", "kscviewer.exe"].contains(&lower.as_str()) || BLACKLIST.iter().any(|word| lower.contains(*word))
 }
 fn title_and_folder(path: &Path, root: &Path, metadata: &ExeMetadata, game_assets: bool) -> (String, PathBuf) {
     let parent = path.parent().unwrap_or(root);
@@ -232,7 +232,7 @@ pub fn scan(folders: &[String]) -> (Vec<Candidate>, usize, Vec<String>) {
 mod tests {
     use super::*;
     #[test] fn support_executables_never_pass_even_with_large_size() {
-        for name in ["UnityCrashHandler64.exe", "unins000.exe", "setup.exe", "vc_redist.exe", "launcher.exe", "EasyAntiCheat.exe", "CrashReportClient.exe", "Option.exe", "KscViewer.exe"] {
+        for name in ["UnityCrashHandler64.exe", "unins000.exe", "setup.exe", "vc_redist.exe", "launcher.exe", "EasyAntiCheat.exe", "CrashReportClient.exe", "Option.exe", "KscViewer.exe", "SCSKiller.exe", "scskillerw.exe", "scskiller_warm.exe"] {
             assert_eq!(score(name, 50_000_000, "Elden Ring", true, &ExeMetadata::default()), -100);
         }
         let metadata = ExeMetadata { product_name: Some("Battle.net Overlay Runtime".into()), description: None };

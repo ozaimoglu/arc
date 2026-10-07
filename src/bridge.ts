@@ -1,5 +1,5 @@
 import { demoSnapshot } from './demo';
-import type { Artwork, ArtworkKind, Game, GameMatch, GameRatings, ScanReport, Settings, Snapshot } from './types';
+import type { Artwork, ArtworkKind, Game, GameMatch, GameRatings, ScanReport, Settings, Snapshot, ShaderSnapshot } from './types';
 
 type TauriGlobal = { core: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>; convertFileSrc(path: string): string }; event: { listen(event: string, handler: () => void): Promise<() => void> } };
 declare global { interface Window { __TAURI__?: TauriGlobal } }
@@ -12,7 +12,7 @@ function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> 
 
 const storageKey = 'arc-preview-v1';
 function readPreview(): Snapshot {
-  try { const data = localStorage.getItem(storageKey); if (data) return JSON.parse(data) as Snapshot; } catch { /* Use fixtures if storage is unavailable. */ }
+  try { const data = localStorage.getItem(storageKey); if (data) return { ...JSON.parse(data) as Snapshot, runningGameIds: [] }; } catch { /* Use fixtures if storage is unavailable. */ }
   return structuredClone(demoSnapshot);
 }
 let preview = readPreview();
@@ -38,6 +38,11 @@ export const api = {
   launch: (id: number): Promise<void> => invoke('launch_game', { id }),
   openFolder: (id: number): Promise<void> => invoke('open_game_folder', { id }),
   openArtworkSite: (): Promise<void> => invoke('open_artwork_site'),
+  pickShaderTool: (): Promise<string | null> => invoke('pick_shader_tool'),
+  openShaderSite: (): Promise<void> => invoke('open_shader_site'),
+  shaderState: (id: number): Promise<ShaderSnapshot> => invoke('shader_state', { id }),
+  startShaderJob: (id: number, action: 'analyze' | 'compile'): Promise<void> => invoke('start_shader_job', { id, action }),
+  stopShaderJob: (id: number): Promise<void> => invoke('stop_shader_job', { id }),
   ratingsRequest: (url: string): Promise<{ body: string; status: number; url: string; retryAfter: string | null }> => invoke('ratings_request', { url }),
   ratingCatalogueTitle: (id: number): Promise<string> => invoke('rating_catalogue_title', { id }),
   ratingAppId: (id: number): Promise<number | null> => invoke('get_rating_app_id', { id }),

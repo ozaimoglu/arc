@@ -57,13 +57,15 @@ pub struct Settings {
     pub api_key: String,
     pub display_name: String,
     pub auto_watch: bool,
+    pub shader_tool: String,
 }
 impl Default for Settings {
-    fn default() -> Self { Self { folders: vec![], api_key: String::new(), display_name: "Player".into(), auto_watch: true } }
+    fn default() -> Self { Self { folders: vec![], api_key: String::new(), display_name: "Player".into(), auto_watch: true, shader_tool: String::new() } }
 }
 
 #[derive(Debug, Serialize)]
-pub struct Snapshot { pub games: Vec<Game>, pub settings: Settings }
+#[serde(rename_all = "camelCase")]
+pub struct Snapshot { pub games: Vec<Game>, pub settings: Settings, pub running_game_ids: Vec<i64> }
 
 #[derive(Debug, Default, Serialize)]
 pub struct ScanReport { pub added: usize, pub updated: usize, pub ignored: usize, pub warnings: Vec<String> }

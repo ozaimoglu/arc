@@ -58,6 +58,10 @@ Details show the source, platform and scales. PS4 entries use PS4 Metacritic rat
 
 Matching/parsing logic is adapted from **CriticPeek**; Rust supplies bounded provider requests and SQLite storage. No Chrome runtime is required. See [rating architecture](docs/ARCHITECTURE.md#game-ratings) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
+## Prepare shaders before you play
+
+Source builds after v0.1.8 integrate the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Games needing a recording stay disabled; shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
+
 ## Built to be understood
 
 ```mermaid

@@ -29,8 +29,17 @@ export interface GameRatings {
   errors: string[]; checkedAt: number; metaCheckedAt?: number | null; metaUserCheckedAt?: number | null; metaUrl?: string | null;
 }
 
-export interface Settings { folders: string[]; apiKey: string; displayName: string; autoWatch: boolean }
-export interface Snapshot { games: Game[]; settings: Settings }
+export interface Settings { folders: string[]; apiKey: string; displayName: string; autoWatch: boolean; shaderTool?: string }
+export interface ShaderGameStatus {
+  id: string; status: string; reason: string; engine: string | null; graphicsApi: string | null;
+  antiCheat: string; shaderCount: number | null; warmedAt: string | null; driver: string | null; canCompile: boolean;
+}
+export interface ShaderJob {
+  gameId: number; title: string; action: 'analyze' | 'compile'; running: boolean;
+  phase: string; lines: string[]; error: string | null; stopped: boolean;
+}
+export interface ShaderSnapshot { installed: boolean; game: ShaderGameStatus | null; job: ShaderJob | null; busy: boolean; warning?: string | null }
+export interface Snapshot { games: Game[]; settings: Settings; runningGameIds: number[] }
 export interface ScanReport { added: number; updated: number; ignored: number; warnings: string[] }
 export type ArtworkKind = 'grid' | 'hero' | 'logo';
 export interface Artwork { id: number; url: string; thumb: string; author: string }

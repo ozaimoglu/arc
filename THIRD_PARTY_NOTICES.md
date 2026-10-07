@@ -7,5 +7,6 @@ Arc's application code and original Eclipse brand assets are licensed under MIT;
 - **Steam, Metacritic and SteamGridDB:** independently operated data/artwork services. Their names, marks, game artwork and review content belong to their respective owners. Arc is not affiliated with or endorsed by these services.
 - **README brand poster:** original Eclipse vector artwork, included under Arc's MIT license. It presents Arc's identity and is not an application screenshot.
 - **Application screenshot:** `docs/assets/arc-library.png` shows the maintainer's installed library. The game artwork, titles and logos visible in it belong to their respective owners and are not covered by Arc's MIT license.
+- **SCSKiller:** optional external shader-preparation tool by the SCSKiller authors, licensed under GPL-3.0-or-later with its upstream additional permission. Arc invokes its official CLI as a separate process; no SCSKiller code or binaries are included in Arc's MIT distribution. See [integration details](docs/SCSKILLER.md) and the [upstream repository](https://github.com/BlueHeisenberg/SCSKiller).
 
 Arc does not bundle games, ROMs, PS4 firmware, game data or the shadPS4 emulator. Users supply their own installations.

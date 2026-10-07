@@ -21,6 +21,7 @@ Arc is a Windows game library built with Tauri 2.12.1, Rust, React, TypeScript, 
 | `db.rs` and `migrations/001_initial.sql` | Library, preferences, ignored executables and process sessions |
 | `artwork.rs` | SteamGridDB search, conservative match ranking, grid/hero/logo selection and bounded image cache |
 | `ratings.rs` | Provider URL/redirect allowlists, bounded HTTP responses, typed ratings validation, local Steam identity and isolated SQLite rating storage |
+| `shaders.rs` | Optional official SCSKiller CLI, exact executable matching, manual metadata handoff, bounded job output and graceful queue control |
 | `src/ratings/` | Bundled CriticPeek 1.5.4 matching/parsers/queues adapted to Rust transport and PC/PS4 platforms |
 | `secrets.rs` | Windows DPAPI credential encryption for the current Windows user |
 | `watcher.rs` | `notify` Windows filesystem watcher, coalesce change bursts and refresh persisted library |
@@ -34,6 +35,8 @@ Arc is a Windows game library built with Tauri 2.12.1, Rust, React, TypeScript, 
 Removing a library entry adds the executable to `ignored_executables` in the same transaction. Later scans cannot re-add it. Hiding preserves the game and makes it available in Hidden games. No game files are deleted.
 
 `sessions` stores the start/end of the directly launched process. On clean process exit, elapsed whole minutes are added to playtime. Session and last-played writes are transactional. Pending sessions from a previous launcher crash are closed without estimating playtime. Playtime is basic process tracking: launcher handoffs, descendants and closing Arc while a game runs are not tracked reliably in v1.
+
+The library snapshot includes `runningGameIds` from the in-memory launch guard, covering both pending starts and directly launched processes. Library-change events publish reservations, launch failures and process exits. Play stays disabled across the hero, details, cards, list and context menu until the tracked process exits or its start fails; a failed library refresh after a successful start retains the disabled state. Running status is transient and is not stored as an installation flag or restored from stale sessions.
 
 Preferences are serialized to SQLite. The personal API key is excluded from preferences JSON and stored as a DPAPI encrypted BLOB. An unreadable credential falls back to an empty key so the offline library still opens. API key entry is disabled in the browser preview.
 
@@ -68,6 +71,10 @@ Title matching rejects mismatched sequels, remakes, DLC and ambiguous exact matc
 Schema 3 adds `ratings_cache` (CriticPeek's source/title aliases) and `game_ratings` (one typed payload per game, bound to current title and PC/PS4 platform). Rename/platform changes stop displaying old matches; game removal cascades its rating record. The original game fields, detector confidence, preferences, encrypted artwork key, exclusions and play history are untouched. Rating records are read with the startup snapshot. Due/missing ratings load sequentially in the background, with detail games prioritized between jobs. Hidden games are excluded. Scores have a seven-day TTL, empty matches one hour, failures without readings one minute. A failed refresh keeps verified prior readings with their original age; manual refresh remains available.
 
 Rust accepts only HTTPS Steam search/details/review endpoints and Metacritic game/review paths. Credentials, custom ports, unrelated hosts/paths and unsafe redirects are rejected. Provider replies are limited to 8 MiB with a 20-second timeout. 403/429 responses are not bypassed; the reused service honors cooldowns and reports partial availability. Rating storage commands only access dedicated `score:v2:` keys/tables, not preferences or secrets. The only data providers are Steam and Metacritic; an optional canonical-title fallback uses the already configured SteamGridDB credential in Rust. No extension profile, developer backend, analytics or account is required.
+
+## Shader preparation
+
+The optional SCSKiller integration runs its official CLI as a separate process. Rust owns the single active job, fixed commands, typed actions and validated installation identity. The frontend presents support reasons and polls the authoritative state, retaining active jobs across navigation. SCSKiller's local snapshot supplies engine/driver/cache status; Arc does not infer successful warming from an installer or process launch. Manual metadata imports preserve the external list under its named mutex and leave new roots unconfirmed for recording. See [process, data and validation boundaries](SCSKILLER.md).
 
 ## Artwork files
 

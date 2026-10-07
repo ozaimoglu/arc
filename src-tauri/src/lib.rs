@@ -8,6 +8,7 @@ mod scanner;
 mod secrets;
 mod watcher;
 mod ratings;
+mod shaders;
 
 use std::{collections::HashSet, path::{Path, PathBuf}, sync::{Arc, Mutex}};
 use models::{Artwork, GameMatch, GamePatch, ScanReport, Settings, Snapshot};
@@ -19,6 +20,7 @@ pub struct AppState {
     scan_lock: tokio::sync::Mutex<()>,
     launching: Mutex<HashSet<i64>>,
     watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    shader: Arc<shaders::Manager>,
 }
 type SharedState = Arc<AppState>;
 type Result<T> = std::result::Result<T, String>;
@@ -62,10 +64,13 @@ async fn open_rating_source(url: String) -> Result<()> {
 
 #[tauri::command]
 async fn get_library(state: State<'_, SharedState>) -> Result<Snapshot> {
-    let path = state.db_path.clone();
+    let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let db = db::open(&path)?;
-        Ok(Snapshot { games: db::games(&db)?, settings: db::settings(&db)? })
+        let db = db::open(&state.db_path)?;
+        let games = db::games(&db)?;
+        let settings = db::settings(&db)?;
+        let running_game_ids = state.launching.lock().map_err(|_| "Could not access running games.".to_string())?.iter().copied().collect();
+        Ok(Snapshot { games, settings, running_game_ids })
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -89,6 +94,7 @@ async fn save_settings(app: tauri::AppHandle, state: State<'_, SharedState>, mut
             if !folders.iter().any(|existing: &String| existing.eq_ignore_ascii_case(&value)) { folders.push(value); }
         }
         settings.folders = folders;
+        if !settings.shader_tool.is_empty() { settings.shader_tool = models::path_string(&shaders::tool_path(&settings.shader_tool)?); }
         let mut db = db::open(&path)?; db::save_settings(&mut db, &settings)
     }).await.map_err(|e| e.to_string())??;
     changed(&app);
@@ -230,9 +236,12 @@ async fn open_game_folder(state: State<'_, SharedState>, id: i64) -> Result<()> 
 async fn launch_game(app: tauri::AppHandle, state: State<'_, SharedState>, id: i64) -> Result<()> {
     let state = state.inner().clone();
     {
+        let shader = state.shader.lock()?;
+        if shader.job.as_ref().is_some_and(|job| job.running && job.game_id == id) { return Err("Finish or stop shader preparation before launching this game.".into()); }
         let mut running = state.launching.lock().map_err(|_| "Could not access running games.".to_string())?;
         if !running.insert(id) { return Err("This game is already running.".into()); }
     }
+    changed(&app);
     let shared = state.clone();
     let launched = tauri::async_runtime::spawn_blocking(move || {
         let mut db = db::open(&shared.db_path)?; let game = db::game(&db, id)?;
@@ -252,7 +261,7 @@ async fn launch_game(app: tauri::AppHandle, state: State<'_, SharedState>, id: i
         Ok::<_, String>((child, session?, start))
     }).await.map_err(|e| e.to_string()).and_then(|result| result);
     match launched {
-        Err(error) => { if let Ok(mut running) = state.launching.lock() { running.remove(&id); } Err(error) }
+        Err(error) => { if let Ok(mut running) = state.launching.lock() { running.remove(&id); } changed(&app); Err(error) }
         Ok((mut child, session_id, start)) => {
             changed(&app);
             tauri::async_runtime::spawn_blocking(move || {
@@ -279,7 +288,7 @@ pub fn run() {
         std::fs::create_dir_all(&data_dir)?;
         let db_path = data_dir.join("db.sqlite");
         db::initialize(&db_path).map_err(std::io::Error::other)?;
-        let state = Arc::new(AppState { data_dir, db_path, scan_lock: tokio::sync::Mutex::new(()), launching: Mutex::new(HashSet::new()), watcher: Mutex::new(None) });
+        let state = Arc::new(AppState { data_dir, db_path, scan_lock: tokio::sync::Mutex::new(()), launching: Mutex::new(HashSet::new()), watcher: Mutex::new(None), shader: Arc::new(shaders::Manager::default()) });
         app.manage(state.clone());
         // Re-evaluate configured folders once after a detection upgrade, away from the UI thread.
         let upgrade = db::needs_detection_upgrade(&db::open(&state.db_path).map_err(std::io::Error::other)?).map_err(std::io::Error::other)?;
@@ -294,6 +303,10 @@ pub fn run() {
         let handle = app.handle().clone();
         std::thread::spawn(move || { if let Err(error) = watcher::restart(&handle, state) { eprintln!("Folder watcher: {error}"); } });
         Ok(())
-    }).invoke_handler(tauri::generate_handler![get_library, pick_folder, save_settings, update_game, remove_game, scan_library, search_metadata, link_metadata, get_artworks, set_artwork, import_artwork, open_artwork_site, open_game_folder, launch_game, ratings_request, ratings_cache_read, ratings_cache_write, save_game_ratings, open_rating_source, rating_catalogue_title, get_rating_app_id])
+    }).on_window_event(|window, event| {
+        if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+            if let Some(state) = window.try_state::<SharedState>() { let _ = state.shader.stop(); }
+        }
+    }).invoke_handler(tauri::generate_handler![get_library, pick_folder, save_settings, update_game, remove_game, scan_library, search_metadata, link_metadata, get_artworks, set_artwork, import_artwork, open_artwork_site, open_game_folder, launch_game, ratings_request, ratings_cache_read, ratings_cache_write, save_game_ratings, open_rating_source, rating_catalogue_title, get_rating_app_id, shaders::shader_state, shaders::start_shader_job, shaders::stop_shader_job, shaders::pick_shader_tool, shaders::open_shader_site])
     .run(tauri::generate_context!()).expect("Arc could not start");
 }

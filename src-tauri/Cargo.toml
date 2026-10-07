@@ -1,6 +1,6 @@
 [package]
 name = "arc-launcher"
-version = "0.1.8"
+version = "0.1.9"
 description = "Your games, together. A local Windows game library."
 authors = ["Arc"]
 edition = "2021"
@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2.12.1", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 rusqlite = { version = "0.37", features = ["bundled"] }
 walkdir = "2"
 notify = "8"
@@ -28,7 +29,7 @@ rfd = "0.15"
 toml = "=1.1.6"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Security_Cryptography"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Security"] }
 
 [profile.release]
 codegen-units = 1

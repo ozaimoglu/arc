@@ -1,5 +1,15 @@
 # Release validation
 
+## v0.1.9 — SCSKiller integration (local build)
+
+The optional CLI integration passed 43 frontend tests and 52 Rust tests, strict TypeScript/Vite bundling, SQLite migration verification and Clippy. Its additional official-CLI smoke test is opt-in rather than a CI game dependency.
+
+The official SCSKiller 1.2.3 portable archive matched upstream's SHA-256. Native analysis/import, successful MARVEL SNAP shader preparation and graceful queue cancellation were exercised through Arc's Rust integration without launching a game. SCSKiller recorded 3,013 shaders, zero failures and zero skips for the successful warm. Arc refreshes the CLI snapshot after warming before displaying the result.
+
+The v0.1.9 Windows x64 NSIS package was built, installed and restarted successfully. The installed executable matches the release build and exposes the shader IPC commands. SQLite integrity and foreign-key checks passed; every existing game, rating, cache, exclusion, session and encrypted credential record was preserved. Only the SCSKiller tool path was added to preferences. Build inputs remained unchanged during packaging.
+
+Upstream limitations were observed: MECCHA CHAMELEON's shader reader fails with an array-bounds error despite its ready status, while the selected Witcher 3 executable needs a confirmed folder/recording. Arc reports these reasons rather than claiming successful preparation. Stutter reduction and new native UI screenshot validation have not been measured.
+
 ## v0.1.8 — Eclipse preview
 
 The Windows x64 NSIS release is checked with the following source-level and packaging gates:

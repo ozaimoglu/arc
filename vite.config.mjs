@@ -8,4 +8,5 @@ export default defineConfig({
   resolve: { preserveSymlinks: true },
   esbuild: { jsx: 'automatic' },
   optimizeDeps: { esbuildOptions: { preserveSymlinks: true } },
+  test: { include: ['src/**/*.test.{ts,tsx}'] },
 });
