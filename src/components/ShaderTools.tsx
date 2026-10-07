@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Cpu, RefreshCw, Square, ArrowUpRight, Trash2 } from 'lucide-react';
+import { Cpu, RefreshCw, Square, ArrowUpRight, Trash2, CircleDot } from 'lucide-react';
 import { api, isDesktop } from '../bridge';
 import type { Game, ShaderSnapshot } from '../types';
 import Modal from './Modal';
@@ -14,6 +14,7 @@ export default function ShaderTools({ game, onConfigure }: { game: Game; onConfi
   const [pending, setPending] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmRecord, setConfirmRecord] = useState(false);
   const [gamePrecache, setGamePrecache] = useState(false);
   const mounted = useRef(false);
   const refresh = useCallback(async () => {
@@ -33,7 +34,8 @@ export default function ShaderTools({ game, onConfigure }: { game: Game; onConfi
   }, [snapshot?.busy, game.consoleLaunch, refresh]);
 
   const job = snapshot?.job?.gameId === game.id || snapshot?.job?.running ? snapshot.job : null;
-  async function start(action: 'analyze' | 'compile') {
+  async function start(action: 'analyze' | 'compile' | 'prepareRecording') {
+    setConfirmRecord(false);
     setPending(true); setError('');
     try { await api.startShaderJob(game.id, action); await refresh(); }
     catch (err) { if (mounted.current) setError(String(err)); }
@@ -68,20 +70,27 @@ export default function ShaderTools({ game, onConfigure }: { game: Game; onConfi
       <p className="field-help">{status?.reason ?? 'Analyze this installation to check shader support. Arc adds its local executable to SCSKiller when needed.'}</p>
       {snapshot.warning && <p className="form-error" role="alert">{snapshot.warning}</p>}
       {status?.warmedAt && <p className="shader-last">Last prepared {new Date(status.warmedAt).toLocaleString()}{status.driver ? ` · Driver ${status.driver}` : ''}</p>}
-      {status?.status === 'NeedsRecording' && <p className="field-help">Create a recording in SCSKiller, then analyze again. Arc does not install a recorder or bypass anti-cheat.</p>}
-      {needsFolderConfirmation && <p className="field-help">Confirm this game’s folder in SCSKiller, then create a recording and analyze again.</p>}
+      {(status?.status === 'NeedsRecording' || needsFolderConfirmation) && !status?.recorderInstalled && <p className="field-help">{snapshot.recordingSupported && status?.canRecord ? 'Prepare a recording, play for at least five minutes in the game world, then close the game and analyze again.' : 'Confirm this game’s folder in SCSKiller, create a gameplay recording, then analyze again. Arc recording setup requires the compatibility CLI.'}</p>}
+      {status?.recorderInstalled && <div className="shader-recording" role="status"><strong><CircleDot size={15} aria-hidden="true" /> Recorder ready</strong><p className="field-help">{status.recordedEnough ? 'Gameplay recording captured. Close the game and analyze again to check compilation.' : 'Play for at least five minutes in the game world, then close the game and analyze again. Menus alone may not capture the required pipelines.'}</p><small>At last analysis: {((status.recordingBytes ?? 0) / 1048576).toFixed(1)} MB recorded</small></div>}
+      {status?.recorderNote && !status.recorderInstalled && status.canRecord && !needsFolderConfirmation && <p className="field-help">{status.recorderNote}</p>}
+      {snapshot.recordingSupported && status?.canRecord && !status.recorderInstalled && <button className="secondary-button" disabled={locked} onClick={() => setConfirmRecord(true)}><CircleDot size={15} aria-hidden="true" /> Prepare recording</button>}
       <div className="shader-actions"><button className="secondary-button" disabled={locked} onClick={() => void start('analyze')}><RefreshCw size={15} aria-hidden="true" /> {status ? 'Analyze again' : 'Analyze game'}</button><button className="primary-button" disabled={locked || !status?.canCompile} onClick={() => void start('compile')}><Cpu size={16} aria-hidden="true" /> {status?.status === 'Warmed' ? 'Recompile shaders' : 'Compile shaders'}</button><button className="text-button" disabled={locked || !status} onClick={() => { setGamePrecache(false); setConfirmClear(true); }}><Trash2 size={15} aria-hidden="true" /> Clear cache</button></div>
       {!game.available && <p className="field-help">Restore this game’s installation before analyzing.</p>}
       {snapshot.busy && !job?.running && <p className="field-help" role="status">The shader cache limit is being changed. Wait for it to finish before preparing or clearing shaders.</p>}
     </>}
     {job && <div className="shader-job">
-      <div className="shader-job-heading"><span role="status" aria-atomic="true">{phases[job.phase] ?? 'Preparing shaders'}{job.gameId !== game.id ? ` · ${job.title}` : ''}</span>{job.running && job.action !== 'clearCache' && <button className="text-button" disabled={stopping || job.phase === 'Stopping'} onClick={() => void stop()}><Square size={13} aria-hidden="true" /> Stop</button>}</div>
+      <div className="shader-job-heading"><span role="status" aria-atomic="true">{job.phase === 'PreparingRecording' ? 'Installing gameplay recorder' : phases[job.phase] ?? 'Preparing shaders'}{job.gameId !== game.id ? ` · ${job.title}` : ''}</span>{job.running && !['clearCache', 'prepareRecording'].includes(job.action) && <button className="text-button" disabled={stopping || job.phase === 'Stopping'} onClick={() => void stop()}><Square size={13} aria-hidden="true" /> Stop</button>}</div>
       {job.running && <progress aria-label="Shader preparation progress" />}
       {job.running && job.lines.length > 0 && <p className="shader-live-line">{job.lines.at(-1)}</p>}
       {job.error && <p className="form-error" role="alert">{job.error}</p>}
       {job.lines.length > 0 && <details className="shader-output"><summary>Operation output</summary><pre tabIndex={0} role="region" aria-label="SCSKiller operation output">{job.lines.join('\n')}</pre></details>}
     </div>}
     {(error || loadError) && <p className="form-error" role="alert">{error || loadError}</p>}
+    {confirmRecord && <Modal title="Prepare gameplay recording?" onClose={() => setConfirmRecord(false)}>
+      <p className="modal-intro">Prepare SCSKiller’s recorder for <strong>{game.title}</strong>. This confirms this installation’s own game folder and adds a recorder DLL beside the executable.</p>
+      <p className="field-help">Keep the game closed during setup. SCSKiller checks anti-cheat, existing DLLs and running processes. Play for at least five minutes afterward, then close the game and analyze again. You can remove the recorder in SCSKiller.</p>
+      <div className="modal-footer"><button className="secondary-button" autoFocus onClick={() => setConfirmRecord(false)}>Cancel</button><button className="primary-button" disabled={locked || !status?.canRecord} onClick={() => void start('prepareRecording')}><CircleDot size={15} aria-hidden="true" /> Install recorder</button></div>
+    </Modal>}
     {confirmClear && <Modal title="Clear shader cache?" onClose={() => setConfirmClear(false)}>
       <p className="modal-intro">Clear the driver and Windows shader cache files SCSKiller can attribute to <strong>{game.title}</strong>. The next launch may stutter while shaders rebuild. Game files and saves are preserved.</p>
       <label className="cache-precache"><input type="checkbox" checked={gamePrecache} onChange={event => setGamePrecache(event.target.checked)} /><span>Also clear the game’s generated precache<small>Includes detected Unreal user pipeline and shader precache files. Shipped shader libraries are preserved.</small></span></label>

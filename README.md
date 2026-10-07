@@ -60,7 +60,7 @@ Matching/parsing logic is adapted from **CriticPeek**; Rust supplies bounded pro
 
 ## Prepare shaders before you play
 
-Source builds after v0.1.8 integrate the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. Games needing a recording stay disabled; shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
+Source builds after v0.1.8 integrate the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [compatibility CLI](tools/scskiller-compat/README.md) improves pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
 
 ## Built to be understood
 
@@ -136,4 +136,4 @@ If Arc belongs in your game setup, star the repository and help shape the next r
 
 ## License
 
-[MIT](LICENSE) © 2026 Arc contributors. Dependencies, game artwork and provider content retain their respective rights. Arc is independent of Valve, Metacritic, SteamGridDB and shadPS4.
+[MIT](LICENSE) © 2026 Arc contributors for Arc's application code and original assets. The optional SCSKiller compatibility patch is separately [GPL-3.0-or-later with upstream additional permission](tools/scskiller-compat/README.md). Dependencies, game artwork and provider content retain their respective rights. Arc is independent of Valve, Metacritic, SteamGridDB and shadPS4.

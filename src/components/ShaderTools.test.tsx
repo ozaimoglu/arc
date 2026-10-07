@@ -38,6 +38,32 @@ it('uses the database id and compile action for a verified ready game', async ()
   await render(); expect(button('Compile shaders').disabled).toBe(false);
   await act(async () => button('Compile shaders').click()); expect(bridge.startShaderJob).toHaveBeenCalledWith(1, 'compile');
 });
+function needsRecorder() {
+  snapshot.recordingSupported = true;
+  snapshot.game = { id: 'manual:abc', status: 'Unsupported', reason: 'needs a recording, once you confirm its game folder', engine: 'Carved', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: null, warmedAt: null, driver: null, canCompile: false, canRecord: true, recorderInstalled: false };
+}
+it('offers recording setup with explicit confirmation and the exact database identity', async () => {
+  needsRecorder(); await render();
+  await act(async () => button('Prepare recording').click());
+  expect(bridge.startShaderJob).not.toHaveBeenCalled();
+  expect(host.querySelector('dialog')?.textContent).toContain(demoGames[0].title);
+  expect(host.querySelector('dialog')?.textContent).toContain('recorder DLL');
+  await act(async () => button('Install recorder').click());
+  expect(bridge.startShaderJob).toHaveBeenCalledWith(1, 'prepareRecording');
+});
+it('keeps recorder setup unavailable for incompatible engines and older tools', async () => {
+  needsRecorder(); snapshot.game!.canRecord = false; await render(); expect(button('Prepare recording')).toBeUndefined();
+  snapshot.game!.canRecord = true; snapshot.recordingSupported = false; await render(); expect(button('Prepare recording')).toBeUndefined();
+});
+it('shows captured bytes and gameplay instructions without claiming a compile', async () => {
+  needsRecorder(); snapshot.game!.recorderInstalled = true; snapshot.game!.recordingBytes = 2097152;
+  await render(); expect(host.textContent).toContain('Recorder ready'); expect(host.textContent).toContain('2.0 MB recorded');
+  expect(host.textContent).toContain('five minutes'); expect(button('Compile shaders').disabled).toBe(true); expect(button('Prepare recording')).toBeUndefined();
+});
+it('preserves recorder setup across navigation without an unsafe Stop action', async () => {
+  snapshot.busy = true; snapshot.job = { gameId: 2, title: 'Other game', action: 'prepareRecording', running: true, phase: 'PreparingRecording', lines: [], error: null, stopped: false };
+  await render(); expect(host.textContent).toContain('Installing gameplay recorder · Other game'); expect(button('Stop')).toBeUndefined();
+});
 it('recovers a global job and can stop it after navigating to another game', async () => {
   snapshot.busy = true; snapshot.job = { gameId: 2, title: 'Other game', action: 'compile', running: true, phase: 'Warming', lines: ['512 / 1024'], error: null, stopped: false };
   await render(); expect(host.textContent).toContain('Compiling shaders · Other game'); expect(button('Analyze game').disabled).toBe(true);

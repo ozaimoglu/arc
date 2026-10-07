@@ -21,7 +21,7 @@ Arc is a Windows game library built with Tauri 2.12.1, Rust, React, TypeScript, 
 | `db.rs` and `migrations/001_initial.sql` | Library, preferences, ignored executables and process sessions |
 | `artwork.rs` | SteamGridDB search, conservative match ranking, grid/hero/logo selection and bounded image cache |
 | `ratings.rs` | Provider URL/redirect allowlists, bounded HTTP responses, typed ratings validation, local Steam identity and isolated SQLite rating storage |
-| `shaders.rs` | Optional official SCSKiller CLI, exact executable matching, manual metadata handoff, bounded job output and graceful queue control |
+| `shaders.rs` | Optional external SCSKiller CLI, exact executable matching, manual metadata handoff, recording preparation, bounded output and graceful queue control |
 | `shader_cache.rs` | Actual driver usage/limit queries, elevated NVIDIA size changes and per-game cache cleanup through the official CLI |
 | `src/ratings/` | Bundled CriticPeek 1.5.4 matching/parsers/queues adapted to Rust transport and PC/PS4 platforms |
 | `secrets.rs` | Windows DPAPI credential encryption for the current Windows user |
@@ -75,7 +75,7 @@ Rust accepts only HTTPS Steam search/details/review endpoints and Metacritic gam
 
 ## Shader preparation
 
-The optional SCSKiller integration runs its official CLI as a separate process. Rust owns the single active job, fixed commands, typed actions and validated installation identity. The frontend presents support reasons and polls the authoritative state, retaining active jobs across navigation. SCSKiller's local snapshot supplies engine/driver/cache status; Arc does not infer successful warming from an installer or process launch. Manual metadata imports preserve the external list under its named mutex and leave new roots unconfirmed for recording. See [process, data and validation boundaries](SCSKILLER.md).
+The optional SCSKiller integration runs an official or compatibility CLI as a separate process. Rust owns the single active job, fixed commands, typed actions and validated installation identity. The frontend presents support reasons and polls the authoritative state, retaining active jobs across navigation. SCSKiller's local snapshot supplies engine/driver/cache status; Arc does not infer successful warming from an installer or process launch. Manual metadata imports preserve the external list under its named mutex and leave new roots unconfirmed. Explicit recording preparation confirms only the selected game's own folder through upstream's public API, preserving an existing confirmed narrower folder. The optional pinned patch is built and tested separately under its upstream license. See [process, data and validation boundaries](SCSKILLER.md).
 
 ## Artwork files
 

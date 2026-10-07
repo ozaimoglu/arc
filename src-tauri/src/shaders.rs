@@ -1,4 +1,4 @@
-//! Optional integration with the official SCSKiller CLI; no upstream code is linked.
+//! Optional integration with the external SCSKiller CLI; no upstream code is linked.
 use std::{fs, io::{BufRead, BufReader, Read, Write}, path::{Path, PathBuf}, process::{ChildStdin, Command, Stdio}, sync::{Mutex, MutexGuard}, time::{Duration, Instant}};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -26,17 +26,19 @@ pub struct Job {
 }
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum Action { Analyze, Compile, ClearCache }
+pub enum Action { Analyze, Compile, ClearCache, PrepareRecording }
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameStatus {
     pub id: String, pub status: String, pub reason: String, pub engine: Option<String>,
     pub graphics_api: Option<String>, pub anti_cheat: String, pub shader_count: Option<u64>,
     pub warmed_at: Option<String>, pub driver: Option<String>, pub can_compile: bool,
+    pub can_record: bool, pub recorder_installed: bool, pub recording_bytes: u64,
+    pub recorded_enough: bool, pub recorder_note: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Snapshot { installed: bool, game: Option<GameStatus>, job: Option<Job>, busy: bool, warning: Option<String> }
+pub struct Snapshot { installed: bool, recording_supported: bool, game: Option<GameStatus>, job: Option<Job>, busy: bool, warning: Option<String> }
 
 impl Manager {
     pub fn lock(&self) -> Result<MutexGuard<'_, Runtime>> { self.inner.lock().map_err(|_| "Shader preparation state is unavailable.".into()) }
@@ -55,8 +57,8 @@ impl Manager {
         let mut state = self.lock()?;
         if id.is_some_and(|id| !state.job.as_ref().is_some_and(|job| job.running && job.game_id == id)) { return Err("There is no running shader operation for this game.".into()); }
         if !state.job.as_ref().is_some_and(|job| job.running) { return Ok(()); }
-        if state.job.as_ref().is_some_and(|job| job.action == Action::ClearCache) {
-            return if id.is_some() { Err("Cache cleanup must finish before starting another operation.".into()) } else { Ok(()) };
+        if state.job.as_ref().is_some_and(|job| matches!(job.action, Action::ClearCache | Action::PrepareRecording)) {
+            return if id.is_some() { Err("This operation must finish before starting another operation.".into()) } else { Ok(()) };
         }
         if state.stopping { return Ok(()); }
         state.stopping = true;
@@ -136,7 +138,24 @@ fn status_from_list(list: &Value, exe: &str) -> Result<Option<GameStatus>> {
         shader_count: entry.get("ShaderCount").and_then(Value::as_u64),
         warmed_at: entry.get("WarmedAt").and_then(Value::as_str).map(str::to_owned),
         driver: entry.get("WarmedDriverVersion").and_then(Value::as_str).map(str::to_owned),
+        can_record: recording_eligible(entry),
+        recorder_installed: entry.get("RecorderInstalled").and_then(Value::as_bool).unwrap_or(false),
+        recording_bytes: entry.get("RecordingBytes").and_then(Value::as_u64).unwrap_or(0),
+        recorded_enough: entry.get("RecordedEnough").and_then(Value::as_bool).unwrap_or(false),
+        recorder_note: entry.get("RecorderNote").and_then(Value::as_str).or_else(|| entry.get("RecorderSkip").and_then(Value::as_str)).map(str::to_owned),
     }))
+}
+fn recording_eligible(entry: &Value) -> bool {
+    entry.get("AntiCheat").and_then(Value::as_str) == Some("None")
+        && entry.get("Engine").is_some_and(Value::is_object)
+        && entry.pointer("/Engine/Encrypted").and_then(Value::as_bool) == Some(false)
+        && entry.pointer("/Engine/Unsupported").is_some_and(Value::is_null)
+        && entry.pointer("/Engine/GraphicsApi").and_then(Value::as_str).is_some_and(|api| api.contains("D3D12"))
+        && !entry.get("ShaderModBlocks").and_then(Value::as_bool).unwrap_or(false)
+}
+fn recording_supported(cli: &Path) -> bool {
+    cli.parent().and_then(|dir| read_json(&dir.join("arc-compat.json")).ok().flatten())
+        .is_some_and(|manifest| manifest.get("Protocol").and_then(Value::as_u64) == Some(1))
 }
 pub(crate) fn game_status(game: &Game) -> Result<Option<GameStatus>> {
     if game.console_launch.is_some() { return Ok(None); }
@@ -155,7 +174,8 @@ fn install_root(game: &Game) -> Result<PathBuf> {
             }
         } else if parent.file_name().is_some_and(|name| name.eq_ignore_ascii_case("bin")) {
             if let Some(root) = parent.parent() { candidate = root.to_path_buf(); }
-        } else if directory.file_name().is_some_and(|name| name.to_string_lossy().to_ascii_lowercase().starts_with("bin")) {
+        } else if directory.file_name().is_some_and(|name| name.to_string_lossy().to_ascii_lowercase().starts_with("bin")
+            || (name.eq_ignore_ascii_case("Retail") && parent.join("Runtime").is_dir())) {
             candidate = parent.to_path_buf();
         }
     }
@@ -164,6 +184,22 @@ fn install_root(game: &Game) -> Result<PathBuf> {
     let root_key = path_key(&models::path_string(&candidate));
     let folder_key = path_key(&models::path_string(&folder));
     if candidate.is_dir() && (root_key == folder_key || root_key.starts_with(&format!("{folder_key}\\"))) { Ok(candidate) } else { Ok(folder) }
+}
+fn confirmed_recording_root(list: &Value, game: &Game) -> Result<Option<PathBuf>> {
+    let entries = list.as_array().ok_or("The manual game list is invalid; recording setup was left unchanged.")?;
+    let Some(entry) = entries.iter().find(|entry| entry.get("Exe").and_then(Value::as_str).is_some_and(|exe| path_key(exe) == path_key(&game.exe_path))
+        && entry.get("Confirmed").and_then(Value::as_bool) == Some(true)) else { return Ok(None); };
+    let root = entry.get("InstallDir").and_then(Value::as_str).ok_or("The confirmed game folder is missing.")?;
+    let root = fs::canonicalize(root).map_err(|_| "The confirmed game folder is unavailable.")?;
+    let root_key = path_key(&models::path_string(&root)); let folder_key = path_key(&game.folder);
+    if (root_key == folder_key || root_key.starts_with(&format!("{folder_key}\\"))) && path_key(&game.exe_path).starts_with(&format!("{root_key}\\")) { Ok(Some(root)) }
+    else { Err("The previously confirmed folder does not match this Arc installation. Review the game folder in SCSKiller.".into()) }
+}
+fn recording_root(game: &Game) -> Result<PathBuf> {
+    match read_json(&data_dir()?.join("manual-games.json"))? {
+        Some(list) => confirmed_recording_root(&list, game)?.map(Ok).unwrap_or_else(|| install_root(game)),
+        None => install_root(game),
+    }
 }
 
 fn merge_manual(list: &mut Value, game: &Game) -> Result<bool> {
@@ -233,13 +269,27 @@ fn queue_stage(line: &str, id: &str) -> Option<&'static str> {
 
 pub(crate) fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action, imported: bool) -> Result<()> {
     launch::plan(game)?;
+    let recording_target = if action == Action::PrepareRecording {
+        if !recording_supported(cli) { return Err("Recording setup requires the Arc compatibility CLI. See tools/scskiller-compat in the Arc repository.".into()); }
+        execute(manager, cli, game, Action::Analyze, false)?;
+        let status = game_status(game)?.ok_or("Analyze this exact game executable before preparing a recording.")?;
+        if !status.can_record { return Err("Recording is unavailable for this build, graphics API or anti-cheat configuration.".into()); }
+        if let Some(job) = &mut manager.lock()?.job { job.phase = "PreparingRecording".into(); }
+        Some(status.id)
+    } else { None };
     let target = if action == Action::Compile {
         let status = game_status(game)?.ok_or("Analyze this game before compiling.")?;
         if !status.can_compile { return Err(status.reason); } Some(status.id)
     } else { None };
     if manager.lock()?.stopping { return Ok(()); }
     let mut command = Command::new(cli);
-    command.arg(if action == Action::Analyze { "scan" } else { "queue" }).current_dir(cli.parent().ok_or("SCSKiller has no installation directory.")?)
+    if let Some(id) = &recording_target {
+        command.args(["arc-record", "prepare", id]).arg(models::path_string(&recording_root(game)?));
+    } else if action == Action::Analyze {
+        command.arg("scan");
+        if !imported { command.arg("--rescan"); }
+    } else { command.arg("queue"); }
+    command.current_dir(cli.parent().ok_or("SCSKiller has no installation directory.")?)
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)] { use std::os::windows::process::CommandExt; command.creation_flags(0x08000000); }
     let mut child = command.spawn().map_err(|e| format!("Could not start SCSKiller: {e}"))?;
@@ -300,6 +350,12 @@ pub(crate) fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action
         let reason = runtime.job.as_ref().and_then(|job| job.lines.iter().rev().find(|line| line.starts_with("error:") || target.as_ref().is_some_and(|id| queue_stage(line, id) == Some("Failed")))).cloned();
         return Err(reason.unwrap_or_else(|| "SCSKiller could not finish this operation. See the output below.".into()));
     }
+    if action == Action::PrepareRecording {
+        execute(manager, cli, game, Action::Analyze, true)?;
+        if !game_status(game)?.is_some_and(|status| status.recorder_installed) {
+            return Err("Recorder setup did not produce a verified installed recorder. Inspect the operation output.".into());
+        }
+    }
     if action == Action::Compile {
         if let Some(job) = &mut manager.lock()?.job { job.phase = "Refreshing".into(); }
         // CLI queue updates state.json, but games.json is only refreshed by a scan.
@@ -330,7 +386,8 @@ pub async fn shader_state(state: State<'_, SharedState>, id: i64) -> Result<Snap
         let job = runtime.job.clone();
         let busy = runtime.busy(); drop(runtime);
         let (game, warning) = match game_status(&game) { Ok(game) => (game, None), Err(error) => (None, Some(error)) };
-        Ok(Snapshot { installed: configured_tool(&db::settings(&db)?.shader_tool).is_ok(), game, job, busy, warning })
+        let tool = configured_tool(&db::settings(&db)?.shader_tool);
+        Ok(Snapshot { installed: tool.is_ok(), recording_supported: tool.is_ok_and(|cli| recording_supported(&cli)), game, job, busy, warning })
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -417,6 +474,31 @@ mod tests {
         }
         assert!(status_from_list(&json!([]), "D:\\Game.exe").is_err());
     }
+    #[test] fn recorder_requires_explicit_engine_compatibility_and_no_anti_cheat() {
+        let mut candidate = entry("manual:abc", "D:\\Game.exe", "Unsupported");
+        assert!(!recording_eligible(&candidate));
+        candidate["Engine"]["Encrypted"] = json!(false); candidate["Engine"]["Unsupported"] = Value::Null;
+        assert!(recording_eligible(&candidate));
+        for (field, value) in [("Encrypted", json!(true)), ("Unsupported", json!("packed shader format")), ("GraphicsApi", json!("Vulkan"))] {
+            let mut blocked = candidate.clone(); blocked["Engine"][field] = value; assert!(!recording_eligible(&blocked));
+        }
+        candidate["AntiCheat"] = json!("Other"); assert!(!recording_eligible(&candidate));
+        candidate["AntiCheat"] = json!("None"); candidate["ShaderModBlocks"] = json!(true); assert!(!recording_eligible(&candidate));
+    }
+    #[test] fn recorder_setup_cannot_be_interrupted_by_stop() {
+        let manager = Manager::default();
+        manager.lock().unwrap().begin(Job { game_id: 4, title: "Fixture".into(), action: Action::PrepareRecording, running: true, phase: "PreparingRecording".into(), lines: vec![], error: None, stopped: false });
+        assert!(manager.stop_for(Some(4)).is_err()); assert!(manager.stop().is_ok()); assert!(!manager.lock().unwrap().stopping);
+    }
+    #[test] fn recording_keeps_a_confirmed_narrower_folder_and_rejects_outside_roots() {
+        let (dir, mut game) = fixture(); let narrow = dir.join("ActualGame"); fs::create_dir(&narrow).unwrap();
+        fs::write(narrow.join("Game.exe"), b"fixture").unwrap(); game.exe_path = models::path_string(&narrow.join("Game.exe"));
+        let mut list = json!([{"Exe": game.exe_path, "InstallDir": models::path_string(&narrow), "Confirmed": true}]);
+        assert_eq!(confirmed_recording_root(&list, &game).unwrap().unwrap(), fs::canonicalize(&narrow).unwrap());
+        list[0]["InstallDir"] = json!(models::path_string(dir.parent().unwrap())); assert!(confirmed_recording_root(&list, &game).is_err());
+        list[0]["Confirmed"] = json!(false); assert!(confirmed_recording_root(&list, &game).unwrap().is_none());
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test] fn manual_import_preserves_existing_unknown_fields_and_confirmation() {
         let (dir, game) = fixture();
         let mut list = json!([{"Exe": game.exe_path, "InstallDir": game.folder, "Name": "Personal title", "Confirmed": true, "FutureField": 42}]);
@@ -440,6 +522,9 @@ mod tests {
         assert_eq!(install_root(&game).unwrap(), fs::canonicalize(&root).unwrap());
         game.folder = models::path_string(&root.join("Project"));
         assert_eq!(install_root(&game).unwrap(), fs::canonicalize(root.join("Project")).unwrap());
+        let retail = root.join("Retail/Game.exe"); fs::create_dir_all(retail.parent().unwrap()).unwrap(); fs::create_dir(root.join("Runtime")).unwrap(); fs::write(&retail, b"fixture").unwrap();
+        game.exe_path = models::path_string(&retail); game.folder = models::path_string(&dir);
+        assert_eq!(install_root(&game).unwrap(), fs::canonicalize(&root).unwrap());
         fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn repairing_an_unconfirmed_root_preserves_the_users_metadata() {
@@ -504,6 +589,13 @@ mod tests {
         execute(&manager, &cli, &game, Action::Analyze, false).unwrap();
         let status = game_status(&game).unwrap().expect("The executable should be mapped by its actual path");
         println!("Official CLI analysis: {} · {}", game.title, status.status);
+        if std::env::var("ARC_SHADER_SMOKE_RECORDING").is_ok_and(|value| value == "1") {
+            assert!(status.can_record, "Recording must be compatible with the exact installation");
+            manager.lock().unwrap().begin(Job { game_id: id, title: game.title.clone(), action: Action::PrepareRecording, running: true, phase: "Analyzing".into(), lines: vec![], error: None, stopped: false });
+            execute(&manager, &cli, &game, Action::PrepareRecording, false).unwrap();
+            assert!(game_status(&game).unwrap().unwrap().recorder_installed);
+            println!("Arc recording setup verified: {}", game.title);
+        }
         if std::env::var("ARC_SHADER_SMOKE_COMPILE").is_ok_and(|value| value == "1") {
             assert!(status.can_compile, "{}", status.reason);
             let stop = std::env::var("ARC_SHADER_SMOKE_STOP").is_ok_and(|value| value == "1");

@@ -311,6 +311,9 @@ code { font-family: 'Cascadia Code', Consolas, monospace; }
 .shader-tools .field-help { max-width: 760px; font-size: 13px; line-height: 1.7; }
 .shader-status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-top: 18px; font-size: 15px; }
 .shader-status.prepared > span { color: var(--rating-good); }
+.shader-recording { padding: 16px 18px; margin: 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.shader-recording strong { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500; }
+.shader-recording small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .shader-actions, .shader-settings-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
 .shader-job { padding: 18px 20px; margin-top: 22px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .shader-job-heading { font-size: 13px; line-height: 1.6; }

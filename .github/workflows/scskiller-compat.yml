@@ -1,0 +1,22 @@
+name: SCSKiller compatibility patch
+on:
+  push:
+    branches: [main]
+    paths: ['tools/scskiller-compat/**', '.github/workflows/scskiller-compat.yml']
+  pull_request:
+    paths: ['tools/scskiller-compat/**', '.github/workflows/scskiller-compat.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build pinned patch and run synthetic regressions
+        shell: pwsh
+        run: ./tools/scskiller-compat/build.ps1

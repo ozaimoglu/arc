@@ -33,12 +33,13 @@ export interface Settings { folders: string[]; apiKey: string; displayName: stri
 export interface ShaderGameStatus {
   id: string; status: string; reason: string; engine: string | null; graphicsApi: string | null;
   antiCheat: string; shaderCount: number | null; warmedAt: string | null; driver: string | null; canCompile: boolean;
+  canRecord?: boolean; recorderInstalled?: boolean; recordingBytes?: number; recordedEnough?: boolean; recorderNote?: string | null;
 }
 export interface ShaderJob {
-  gameId: number; title: string; action: 'analyze' | 'compile' | 'clearCache'; running: boolean;
+  gameId: number; title: string; action: 'analyze' | 'compile' | 'clearCache' | 'prepareRecording'; running: boolean;
   phase: string; lines: string[]; error: string | null; stopped: boolean;
 }
-export interface ShaderSnapshot { installed: boolean; game: ShaderGameStatus | null; job: ShaderJob | null; busy: boolean; warning?: string | null }
+export interface ShaderSnapshot { installed: boolean; recordingSupported?: boolean; game: ShaderGameStatus | null; job: ShaderJob | null; busy: boolean; warning?: string | null }
 export type ShaderCacheLimit = 'default' | '1' | '5' | '10' | '20' | '50' | '100' | 'unlimited';
 export interface ShaderCacheState { installed: boolean; gpu: string; usage: string; limit: string; selectedLimit: ShaderCacheLimit | null; configurable: boolean; busy: boolean }
 export interface Snapshot { games: Game[]; settings: Settings; runningGameIds: number[] }

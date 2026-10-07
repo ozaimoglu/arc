@@ -306,7 +306,11 @@ pub fn run() {
         std::thread::spawn(move || { if let Err(error) = watcher::restart(&handle, state) { eprintln!("Folder watcher: {error}"); } });
         Ok(())
     }).on_window_event(|window, event| {
-        if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if let Some(state) = window.try_state::<SharedState>() {
+                let preparing = state.shader.lock().ok().is_some_and(|runtime| runtime.job.as_ref().is_some_and(|job| job.running && job.action == shaders::Action::PrepareRecording));
+                if preparing { api.prevent_close(); state.shader.line("Recorder setup is finishing. Close Arc when it completes."); return; }
+            }
             if let Some(state) = window.try_state::<SharedState>() { let _ = state.shader.stop(); }
         }
     }).invoke_handler(tauri::generate_handler![get_library, pick_folder, save_settings, update_game, remove_game, scan_library, search_metadata, link_metadata, get_artworks, set_artwork, import_artwork, open_artwork_site, open_game_folder, launch_game, ratings_request, ratings_cache_read, ratings_cache_write, save_game_ratings, open_rating_source, rating_catalogue_title, get_rating_app_id, shaders::shader_state, shaders::start_shader_job, shaders::stop_shader_job, shaders::pick_shader_tool, shaders::open_shader_site, shader_cache::shader_cache_state, shader_cache::set_shader_cache_limit, shader_cache::clear_shader_cache])

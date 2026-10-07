@@ -1,5 +1,17 @@
 # Release validation
 
+## v0.1.12 — Shader compatibility and recording preparation (local build)
+
+61 frontend tests, 62 Rust tests, strict TypeScript/Vite bundling, Clippy and schema verification passed. A clean checkout of the pinned SCSKiller source accepted the maintained patch and passed 30 synthetic reader/manual-folder/recorder regression tests before publishing the self-contained compatibility CLI. Its native assets came from the checksum-verified official portable archive.
+
+All 47 visible native PC installations were re-analyzed. The 19 compilable installations passed full shader indexing; three require gameplay recordings, 23 retain unsupported reader/packed/encrypted-format reasons, and two use a store executable different from Arc's selected executable. The shadPS4 entry is handled by the emulator. Full indexes are compatibility evidence, not proof that every game's shaders have been warmed.
+
+007 First Light now detects its raw pipeline-cache containers without a title-specific override: its index contains 8,429 shader programs, and a real GPU warm completed 5,748 planned pipelines with zero failures, skips or crashes. MECCHA CHAMELEON's malformed Unreal localization mapping no longer prevents shader reading: its 23,560-program index produced a successful 20,102-pipeline warm, also with zero failures, skips or crashes. Streaming diagnostic JSON also resolved five previously failing large index exports. These fixes do not add AES keys or readers for encrypted/unknown formats.
+
+Recorder installation was verified for CONTROL Resonant, Resident Evil 4, Resident Evil Requiem and the ray-tracing portions of 007/Witcher 3. The opt-in native Rust tests verified 007's repaired installation identity and CONTROL Resonant's recording setup through Arc's command adapter. Actual gameplay recordings were not captured: those three recording-required games and the two ray-tracing portions still await gameplay. No game was launched for this validation; driver cache sizing and cache deletion were not changed.
+
+The final Windows x64 NSIS installer was built from frozen inputs, installed and restarted as v0.1.12 with a responding Arc window. The installed executable matches the built artifact. SQLite integrity/schema and every existing library, rating, session and credential record were preserved; only the selected shader-tool preference changed to the stable compatibility installation. The global GPU cache limit remained 100 GB. Native screenshot QA and gameplay stutter measurements were not performed.
+
 ## v0.1.11 — Shader cache controls (local build)
 
 57 frontend tests and 59 Rust tests passed, along with strict TypeScript/Vite production bundling, Clippy and the SQLite schema check. Coverage includes explicit cleanup confirmation/cancellation, optional generated precache, exact game identity, unsupported GPU controls, global operation locks, navigation recovery, localized cache sizes, administrator-result validation and failure feedback.
