@@ -1,6 +1,6 @@
 [package]
 name = "arc-launcher"
-version = "0.1.12"
+version = "0.1.13"
 description = "Your games, together. A local Windows game library."
 authors = ["Arc"]
 edition = "2021"

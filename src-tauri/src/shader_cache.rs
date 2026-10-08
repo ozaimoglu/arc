@@ -218,7 +218,7 @@ pub async fn clear_shader_cache(state: State<'_, SharedState>, id: i64, game_pre
     if game.console_launch.is_some() { return Err("shadPS4 manages its own shader cache.".into()); }
     launch::plan(&game)?;
     let cli = shaders::configured_tool(&db::settings(&database)?.shader_tool)?;
-    let status = shaders::game_status(&game)?.ok_or("Analyze this executable before clearing its cache.")?;
+    let status = shaders::game_status(&cli, &game)?.ok_or("Analyze this executable before clearing its cache.")?;
     let args = clear_args(&status.id, game_precache)?;
     {
         let mut runtime = state.shader.lock()?;

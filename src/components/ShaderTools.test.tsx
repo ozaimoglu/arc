@@ -38,6 +38,22 @@ it('uses the database id and compile action for a verified ready game', async ()
   await render(); expect(button('Compile shaders').disabled).toBe(false);
   await act(async () => button('Compile shaders').click()); expect(bridge.startShaderJob).toHaveBeenCalledWith(1, 'compile');
 });
+it.each(['PartlyCompiled', 'PartlyWarmed', 'CompileUnreached'])('does not show %s as fully prepared', async status => {
+  snapshot.game = { id: 'steam:1', status, reason: 'Driver verification result.', engine: 'Unreal', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: 120, warmedAt: '2026-10-08T12:00:00Z', driver: 'test', canCompile: true };
+  await render(); expect(host.textContent).not.toContain('Shaders prepared');
+  expect(host.querySelector('.shader-status.prepared')).toBeNull(); expect(host.textContent).toContain('Driver verification result.');
+});
+it('shows the no-stutter verdict without asking for an unnecessary recording', async () => {
+  snapshot.game = { id: 'steam:1', status: 'NoShaderStutter', reason: 'The game precompiles its shaders.', engine: 'Unreal', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: null, warmedAt: null, driver: null, canCompile: false, canRecord: false, recorderInstalled: true };
+  await render(); expect(host.textContent).toContain('No shader stutter'); expect(host.textContent).not.toContain('five minutes');
+  expect(button('Compile shaders').disabled).toBe(true); expect(button('Prepare recording')).toBeUndefined();
+});
+it('directs offline recordings to the external tool without offering recorder setup', async () => {
+  snapshot.recordingSupported = true;
+  snapshot.game = { id: 'steam:1', status: 'NeedsOfflineSession', reason: 'EasyAntiCheat blocks recording.', engine: 'Unreal', graphicsApi: 'D3D12', antiCheat: 'EasyAntiCheat', shaderCount: null, warmedAt: null, driver: null, canCompile: false, canRecord: false };
+  await render(); expect(host.textContent).toContain('Offline session needed'); expect(host.textContent).toContain('Manage this game’s offline recording in SCSKiller');
+  expect(button('Prepare recording')).toBeUndefined(); expect(button('Compile shaders').disabled).toBe(true);
+});
 function needsRecorder() {
   snapshot.recordingSupported = true;
   snapshot.game = { id: 'manual:abc', status: 'Unsupported', reason: 'needs a recording, once you confirm its game folder', engine: 'Carved', graphicsApi: 'D3D12', antiCheat: 'None', shaderCount: null, warmedAt: null, driver: null, canCompile: false, canRecord: true, recorderInstalled: false };

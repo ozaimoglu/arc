@@ -1,6 +1,6 @@
 # Shader preparation with SCSKiller
 
-Arc development builds after v0.1.8 can analyze and compile shaders through the **SCSKiller CLI**. The integration supports official SCSKiller 1.2.3 and the optional **1.2.3-arc.1 compatibility CLI**. SCSKiller remains an external installation; its binaries are not bundled in Arc's installer. The separately licensed patch and reproducible build instructions live in [tools/scskiller-compat](../tools/scskiller-compat/README.md).
+Arc development builds after v0.1.8 can analyze and compile shaders through the **SCSKiller CLI**. Arc 0.1.13 supports official SCSKiller **1.2.4**, older 1.2.3 installations and the optional **1.2.4-arc.2 compatibility CLI**. SCSKiller remains an external installation; its binaries are not bundled in Arc's installer. The separately licensed patch and reproducible build instructions live in [tools/scskiller-compat](../tools/scskiller-compat/README.md).
 
 ## Connect
 
@@ -23,13 +23,18 @@ Play for at least five minutes in the game world, close the game completely, and
 
 Rust runs fixed `scan`, `queue`, `arc-record prepare`, `cache get`, `cache set` and `cache clear` commands. Arguments are passed separately; the elevated driver-setting action uses the Windows shell's `runas` verb with validated size tokens and a generated result-file path. The frontend supplies an Arc database game ID and typed actions. Operation identities come from SCSKiller's local game list and are validated; titles and Steam rating IDs never select an installation. Explicit analysis uses `scan --rescan`; compile/setup completion uses a normal scan to refresh actual state.
 
-Arc reads the bounded `%LOCALAPPDATA%\SCSKiller\games.json` snapshot and matches canonical executable paths. Store discovery runs first. If the selected executable is absent, Arc adds only that game to `manual-games.json`, preserving existing entries and unknown fields. This update uses SCSKiller's cross-process named mutex, a backup and an atomic replacement. Newly imported roots are **unconfirmed**, so SCSKiller's recorder is not enabled by the import.
+Arc reads the bounded `games.json` snapshot and matches canonical executable paths. Installed and Arc compatibility CLIs use `%LOCALAPPDATA%\SCSKiller`. Official 1.2.4 portable packages use their own `data` folder after upstream completes its atomic migration; Arc follows the selected package's `.portable` and `data\migrated` markers, falling back to the shared store until then. Status reads, manual imports and recording folder checks use the same resolved store. Store discovery runs first. If the selected executable is absent, Arc adds only that game to `manual-games.json`, preserving existing entries and unknown fields. This update uses SCSKiller's cross-process named mutex, a backup and an atomic replacement. Newly imported roots are **unconfirmed**, so SCSKiller's recorder is not enabled by the import.
 
 For nested `bin/x64*`, Unreal `Binaries/Win64` and sibling `Retail`/`Runtime` layouts, Arc passes the engine's installation root instead of an outer delivery folder. Re-analysis also repairs an older unconfirmed root when the detected root is inside it. Confirmed folders, personal names and unknown metadata remain unchanged during analysis. Recording preparation explicitly confirms an eligible manual game's own folder through SCSKiller.
 
 Arc does not invoke offline anti-cheat launches or scheduled-task commands. Recording setup changes only the selected game's folder confirmation and recorder override. Existing SCSKiller global preferences and accounts remain owned by SCSKiller. Its CLI performs shader/driver compatibility checks, cache attribution and cache warming. Arc drains stdout/stderr concurrently and retains only the latest 100 output lines.
 
 One operation runs at a time. Analysis has a ten-minute timeout per scan pass. Compilation uses the CLI queue's graceful `stop`/`quit` protocol instead of forcibly killing a warmer. Closing Arc requests the same stop. Driver or game updates are re-evaluated by the next SCSKiller scan/compile rather than inferred from an old successful exit code.
+
+The compatibility CLI treats explicit `scan --rescan` as a user-requested operation,
+matching upstream's manual refresh mode. It reports the game being analyzed and
+avoids background I/O starvation. Normal status-refresh scans retain upstream's
+background I/O policy.
 
 ## Cache controls
 
@@ -46,6 +51,10 @@ Cleanup remains available for analyzed games even when their shader format canno
 - **Encrypted or packed shaders / unsupported engine:** the installed SCSKiller reader cannot prepare this build. Recording alone is not a universal fix.
 - **Different store executable:** store discovery can replace a manual entry with the store's executable. If Arc uses another program in the same installation, exact matching remains disabled; review Game properties and the SCSKiller entry instead of compiling a different executable silently.
 - **Ready, then operation fails:** detection is a compatibility check, not a full shader-index test. An upstream reader or GPU compiler can still fail; the operation output contains the actual error.
+- **Partly compiled / Partly warmed:** upstream reports that the driver rejected over 10% of the plan, or the first launch still compiled over 20% of its pipeline creates. Arc keeps these distinct from fully prepared shaders; unknown historical counts do not imply a partial failure.
+- **Compile did not help:** the recorded launch did not use the prepared cache. Review the game's loader requirements in SCSKiller.
+- **No shader stutter:** upstream's verdict says preparation is unnecessary. Arc shows that reason and does not offer compilation or recorder setup.
+- **Offline session needed:** handle the offline workflow in SCSKiller. Arc does not install a recorder while anti-cheat is present or start an offline launch.
 
 ## Validation
 

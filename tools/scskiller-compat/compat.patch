@@ -1,76 +1,47 @@
 diff --git a/src/SCSKiller.Core/Carved/CarvedReader.cs b/src/SCSKiller.Core/Carved/CarvedReader.cs
 --- a/src/SCSKiller.Core/Carved/CarvedReader.cs
 +++ b/src/SCSKiller.Core/Carved/CarvedReader.cs
-@@ -191,7 +191,8 @@
+@@ -70,7 +70,9 @@
+             : programs == 0 ? $"no raw DXBC/DXIL shaders in its files ({read / 1e9:F1} GB sampled): shaders are {packed}"
+             : graphics == 0 ? $"only {compute} raw compute shaders: graphics shaders are {packed}"
+             : $"only {graphics} raw graphics shaders: the rest are {packed}";
+-        return new EngineInfo(Family, programs == 0 ? "-" : version, null, GraphicsApi(game, dxil > 0), false, unsupported);
++        // A reader-incompatible game cannot be planned or recorded; do not inspect unrelated DLLs just for its API label.
++        var api = unsupported == null ? GraphicsApi(game, dxil > 0) : dxil > 0 ? "D3D12" : "Unknown";
++        return new EngineInfo(Family, programs == 0 ? "-" : version, null, api, false, unsupported);
+     }
+ 
+     public ShaderIndex Index(Game game, EngineInfo engine, IProgress<string>? log, CancellationToken ct)
+@@ -230,7 +232,7 @@
          var opts = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, MaxRecursionDepth = 8 };
          var all = new DirectoryInfo(dir).EnumerateFiles("*", opts).Where(f => f.Length >= 64 && !NotShaders.Contains(f.Extension)).ToList();
          bool Named(FileInfo f) => Path.GetRelativePath(dir, f.FullName) is var rel
 -            && (rel.Contains("shader", StringComparison.OrdinalIgnoreCase) || rel.Contains("pso", StringComparison.OrdinalIgnoreCase));
-+            && (rel.Contains("shader", StringComparison.OrdinalIgnoreCase) || rel.Contains("pso", StringComparison.OrdinalIgnoreCase)
-+                || rel.Contains("pipeline", StringComparison.OrdinalIgnoreCase));
++            && (rel.Contains("shader", StringComparison.OrdinalIgnoreCase) || rel.Contains("pso", StringComparison.OrdinalIgnoreCase) || rel.Contains("pipeline", StringComparison.OrdinalIgnoreCase));
          return (all.Where(Named).OrderBy(f => f.FullName, StringComparer.OrdinalIgnoreCase).ToList(),
              all.Where(f => !Named(f) && f.Length >= 64 << 10).OrderBy(f => f.Length).ThenBy(f => f.FullName, StringComparer.OrdinalIgnoreCase).ToList());
      }
-diff --git a/src/SCSKiller.Core/Unreal/UnrealReader.cs b/src/SCSKiller.Core/Unreal/UnrealReader.cs
---- a/src/SCSKiller.Core/Unreal/UnrealReader.cs
-+++ b/src/SCSKiller.Core/Unreal/UnrealReader.cs
-@@ -186,7 +186,7 @@
- 
-     ShaderIndex IndexCore(Game game, EngineInfo engine, IProgress<string>? log, CancellationToken ct)
+@@ -336,6 +338,8 @@
+     /// D3D11 / Vulkan when that's all they import; "D3D11 or D3D12" when nothing is readable.</summary>
+     static string GraphicsApi(Game game, bool dxil)
      {
--        using var provider = Mount(PaksDir(game.InstallDir) ?? throw new DirectoryNotFoundException($"no Content/Paks under {game.InstallDir}"), GameOf(engine), keys.Stored(game));
-+        using var provider = Mount(PaksDir(game.InstallDir) ?? throw new DirectoryNotFoundException($"no Content/Paks under {game.InstallDir}"), GameOf(engine), keys.Stored(game), log);
-         var ue5 = engine.Version.StartsWith('5') || engine.Version.StartsWith('6');
-         var ue58 = Version.TryParse(engine.Version, out var v) && v >= new Version(5, 8); // RootSig.Rule.Ue58
-         if (!Libraries(provider).Any()) return IndexInline(provider, game, log, ct, ue5, ue58);
-@@ -688,15 +688,33 @@
- 
-     static void InitCodecs() => Codecs.Load();
- 
--    static DefaultFileProvider Mount(string paks, EGame game, FAesKey? key)
-+    static DefaultFileProvider Mount(string paks, EGame game, FAesKey? key, IProgress<string>? log = null)
-     {
-         InitCodecs();
-         var provider = new DefaultFileProvider(paks, SearchOption.TopDirectoryOnly, new VersionContainer(game), StringComparer.OrdinalIgnoreCase);
-         provider.Initialize();
-         provider.Mount(); // unencrypted containers
-         if (key != null) provider.SubmitKey(new FGuid(), key); // encrypted ones the key opens
--        provider.PostMount();
-+        PostMountForShaders(provider.PostMount, log);
-         return provider;
-+    }
-+
-+    internal static void PostMountForShaders(Action postMount, IProgress<string>? log = null)
-+    {
-+        try { postMount(); }
-+        catch (IndexOutOfRangeException e) when (LocalizationMappingFailure(e))
-+        {
-+            // CUE4Parse splits CultureMappings on ';' without validating its length. Localization is unrelated
-+            // to shader archives, which are already mounted. Keep archive/decryption errors fatal.
-+            log?.Report("Unreal: malformed localization mapping ignored; reading mounted shader archives.");
-+        }
-+    }
-+    static bool LocalizationMappingFailure(Exception error)
-+    {
-+        // Array bounds exceptions can name a runtime ThrowHelper as TargetSite. Inspect the first CUE4Parse frame.
-+        var origin = new StackTrace(error).GetFrames()?.Select(frame => frame.GetMethod())
-+            .FirstOrDefault(method => method?.DeclaringType?.Assembly == typeof(DefaultFileProvider).Assembly);
-+        return origin?.DeclaringType == typeof(InternationalizationDictionary) && origin.Name == "InitFromIni";
-     }
- 
-     /// <summary>The largest &lt;Project&gt;/Content/Paks (by .pak + .ucas bytes); null = not a cooked UE game.</summary>
++        // DXIL requires D3D12; imports cannot change the result and need not open unrelated DLLs.
++        if (dxil) return "D3D12";
+         var apis = Imports(game);
+         var core = new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 4, IgnoreInaccessible = true };
+         bool d3d12 = dxil || apis.Contains("D3D12") || Directory.EnumerateFiles(game.InstallDir, "D3D12Core.dll", core).Any();
 diff --git a/src/SCSKiller.Cli/Program.cs b/src/SCSKiller.Cli/Program.cs
 --- a/src/SCSKiller.Cli/Program.cs
 +++ b/src/SCSKiller.Cli/Program.cs
-@@ -43,6 +43,7 @@
- 
+@@ -44,6 +44,7 @@
  Console.OutputEncoding = System.Text.Encoding.UTF8;  // game names carry ™ and ®
+ RouteFailover.Product = "SCSKiller-CLI";
  if (args.Length == 0 || args[0] is "-h" or "--help" or "help") { Console.WriteLine(Usage); return 0; }
-+if (args[0] == "arc-info") { Console.WriteLine("{\"Protocol\":1,\"Version\":\"1.2.3-arc.1\"}"); return 0; }
++if (args[0] == "arc-info") { Console.WriteLine(JsonSerializer.Serialize(new { Protocol = 1, Version = "1.2.4-arc.2" })); return 0; }
  // The app is handing over to Update.exe, which replaces this folder: start nothing (the scheduled task runs again later).
- if (Busy.Applying(AppStore.DefaultDir, DateTimeOffset.UtcNow)) { Console.Error.WriteLine("an update is being installed; try again in a minute"); return 0; }
- int code;
-@@ -57,6 +58,7 @@
+ // Packaging never reads the app's data folder.
+ if (args[0] != "fetch-codecs" && Busy.Applying(AppStore.DefaultDir, DateTimeOffset.UtcNow))
+@@ -67,6 +68,7 @@
          "rewarm-stale" => await RewarmStale(args.Contains("--if-driver-changed")),
          "cache" => args.ElementAtOrDefault(1) == "clear" ? await CacheClear() : Cache(),
          "record" => await Record(),
@@ -78,7 +49,16 @@ diff --git a/src/SCSKiller.Cli/Program.cs b/src/SCSKiller.Cli/Program.cs
          "index" => await Index(),
          "rehydrate" => await RehydrateCommand(),
          "reference" when args.ElementAtOrDefault(1) == "export" => await ReferenceExport(),
-@@ -392,6 +394,26 @@
+@@ -112,7 +114,7 @@
+ {
+     var k = ScsKiller.CreateDefault();
+     k.Log = new StderrLog();   // synchronous: a message logged just before exit still prints
+-    await (rescan ? k.RescanAsync(CancellationToken.None) : k.ScanAsync(CancellationToken.None));
++    await (rescan ? k.RescanAsync(CancellationToken.None, userRequested: true) : k.ScanAsync(CancellationToken.None));
+     return k;
+ }
+ 
+@@ -404,6 +406,27 @@
      return 0;
  }
  
@@ -88,6 +68,7 @@ diff --git a/src/SCSKiller.Cli/Program.cs b/src/SCSKiller.Cli/Program.cs
 +    var k = await Open();
 +    var g = k.Games.SingleOrDefault(s => s.Game.Id == args[2]) ?? throw new ArgumentException("the exact game id was not found");
 +    if (g.AntiCheat != AntiCheat.None) return Fail("recording is refused for anti-cheat games");
++    if (g.NotPlanned || g.ShaderModBlocks || ScsKiller.NeedsOfflineSession(g)) return Fail("recording is unavailable for this game configuration");
 +    if (g.Engine is not { } engine || engine.Encrypted || engine.Unsupported != null || !engine.GraphicsApi.Contains("D3D12"))
 +        return Fail("this game's files do not support DirectX 12 recording");
 +    if (g.Game.Store == Store.Manual)
@@ -105,7 +86,7 @@ diff --git a/src/SCSKiller.Cli/Program.cs b/src/SCSKiller.Cli/Program.cs
  async Task<int> Record()
  {
      bool alongside = args.Length > 3 && args[1] == "alongside" && args[3] is "on" or "off";
-@@ -447,7 +469,8 @@
+@@ -459,7 +482,8 @@
      if (args.Length < 2 || Opt("--out") is not { } outDir) return Fail("index <game> --out <dir>");
      var (_, _, _, engine, index) = await OpenIndex(args[1], new Progress<string>(Console.WriteLine));
      Directory.CreateDirectory(outDir);
@@ -144,50 +125,14 @@ new file mode 100644
 +        Assert.Null(engine.Unsupported); Assert.Contains("+RTS0", engine.Version);
 +    }
 +}
-diff --git a/tests/SCSKiller.Tests/Unreal/ArcUnrealMountTests.cs b/tests/SCSKiller.Tests/Unreal/ArcUnrealMountTests.cs
-new file mode 100644
---- /dev/null
-+++ b/tests/SCSKiller.Tests/Unreal/ArcUnrealMountTests.cs
-@@ -0,0 +1,42 @@
-+using System.Reflection;
-+using System.Runtime.ExceptionServices;
-+using CUE4Parse.FileProvider;
-+using CUE4Parse.UE4.Versions;
-+using SCSKiller.Core.Unreal;
-+using SCSKiller.Tests.Planning;
-+
-+namespace SCSKiller.Tests.Unreal;
-+
-+public class ArcUnrealMountTests
-+{
-+    [Fact]
-+    public void MalformedLocalizationDoesNotBlockShaderArchiveReading()
-+    {
-+        using var provider = new DefaultFileProvider(Ff7.TempDir("arc-ini"), SearchOption.TopDirectoryOnly,
-+            new VersionContainer(EGame.GAME_UE5_5), StringComparer.OrdinalIgnoreCase);
-+        provider.DefaultGame.Read(new StringReader("[Internationalization]\n+CultureMappings=malformed\n"));
-+        var method = typeof(InternationalizationDictionary).GetMethod("InitFromIni", BindingFlags.NonPublic | BindingFlags.Instance)!;
-+        void Initialize()
-+        {
-+            try { method.Invoke(provider.Internationalization, [provider.DefaultGame, provider]); }
-+            catch (TargetInvocationException e) when (e.InnerException != null) { ExceptionDispatchInfo.Capture(e.InnerException).Throw(); }
-+        }
-+        Assert.Throws<IndexOutOfRangeException>(Initialize);
-+        var log = new Capture();
-+        UnrealReader.PostMountForShaders(Initialize, log);
-+        Assert.Contains("localization mapping", log.Line);
-+    }
-+
-+    [Fact]
-+    public void UnrelatedArchiveAndBoundsErrorsRemainFatal()
-+    {
-+        Assert.Throws<InvalidDataException>(() => UnrealReader.PostMountForShaders(() => throw new InvalidDataException("archive")));
-+        Assert.Throws<IndexOutOfRangeException>(() => UnrealReader.PostMountForShaders(() => throw new IndexOutOfRangeException("shader")));
-+    }
-+
-+    sealed class Capture : IProgress<string>
-+    {
-+        public string Line = "";
-+        public void Report(string line) => Line = line;
-+    }
-+}
+diff --git a/src/SCSKiller.Core/App/ScsKiller.cs b/src/SCSKiller.Core/App/ScsKiller.cs
+--- a/src/SCSKiller.Core/App/ScsKiller.cs
++++ b/src/SCSKiller.Core/App/ScsKiller.cs
+@@ -435,6 +435,7 @@
+             tickets.Add(Ticket());
+             var fresh = false;
+             var stale = false;
++            Log?.Report("Analyzing: " + g.Name);
+             states.Add(unresolved.TryGetValue(g.Id, out var why) ? Unread(g, why, out stale) : Evaluate(g, force, out fresh, out stale));
+             driverStale.Add(stale);
+             detected |= fresh;

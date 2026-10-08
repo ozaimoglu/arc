@@ -1,5 +1,28 @@
 # Release validation
 
+## v0.1.13 — SCSKiller 1.2.4 update (local build)
+
+66 frontend tests, 64 Rust tests, strict TypeScript/Vite bundling, Clippy and schema
+verification passed. A clean checkout of SCSKiller 1.2.4 accepted the rebased
+compatibility patch and passed 34 reader/manual-folder/recorder/portable-store
+regressions. The native assets came from the checksum-verified official portable
+archive. Upstream now handles malformed Unreal INI data, so the older Arc workaround
+was removed.
+
+Tests cover the migrated portable store, partial/unreached compilation results,
+no-stutter verdicts and offline-recording UI gating. Explicit compatibility scans use
+upstream's user-requested I/O mode and report the current game. DXIL detection avoids
+unnecessary import-table reads; unsupported carved formats retain their support
+reason without opening extra DLLs to infer an API label.
+
+The frozen Windows x64 NSIS build was installed and restarted as v0.1.13. Its binary
+matches the built artifact. SQLite integrity/schema and all library, rating, session
+and credential records were preserved; only the selected shader-tool preference
+changed. The native Rust cache adapter queried SCSKiller 1.2.4 on the RTX 4090 and
+verified the unchanged 100 GB limit with a 52.5 GB upper-bound disk reading. No cache
+deletion or new GPU warming was performed. Native screenshot QA and gameplay stutter
+measurements were not performed.
+
 ## v0.1.12 — Shader compatibility and recording preparation (local build)
 
 61 frontend tests, 62 Rust tests, strict TypeScript/Vite bundling, Clippy and schema verification passed. A clean checkout of the pinned SCSKiller source accepted the maintained patch and passed 30 synthetic reader/manual-folder/recorder regression tests before publishing the self-contained compatibility CLI. Its native assets came from the checksum-verified official portable archive.

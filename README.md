@@ -60,7 +60,7 @@ Matching/parsing logic is adapted from **CriticPeek**; Rust supplies bounded pro
 
 ## Prepare shaders before you play
 
-Source builds after v0.1.8 integrate the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [compatibility CLI](tools/scskiller-compat/README.md) improves pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
+Source builds after v0.1.8 integrate the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation. Arc 0.1.13 supports **SCSKiller 1.2.4**, including its portable data layout and partial-compilation verdicts. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [compatibility CLI](tools/scskiller-compat/README.md) improves pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
 
 ## Built to be understood
 

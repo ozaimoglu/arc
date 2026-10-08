@@ -68,9 +68,21 @@ impl Manager {
     }
 }
 
-fn data_dir() -> Result<PathBuf> {
+fn local_data_dir() -> Result<PathBuf> {
     std::env::var_os("LOCALAPPDATA").map(|path| PathBuf::from(path).join("SCSKiller")).ok_or_else(|| "SCSKiller integration is supported on Windows only.".into())
 }
+fn resolved_data_dir(cli: &Path, local: PathBuf) -> PathBuf {
+    // SCSKiller 1.2.4 migrates a marked portable package only after an atomic copy completes.
+    // The Arc compatibility package has no .portable marker and continues using the shared store.
+    for root in cli.parent().into_iter().flat_map(|dir| dir.ancestors().skip(1).take(2)) {
+        if root.join(".portable").is_file() {
+            let data = root.join("data");
+            return if data.join("migrated").is_file() { data } else { local };
+        }
+    }
+    local
+}
+fn data_dir(cli: &Path) -> Result<PathBuf> { Ok(resolved_data_dir(cli, local_data_dir()?)) }
 
 pub fn tool_path(selected: &str) -> Result<PathBuf> {
     let path = PathBuf::from(selected);
@@ -87,7 +99,7 @@ pub fn tool_path(selected: &str) -> Result<PathBuf> {
 
 pub(crate) fn configured_tool(selected: &str) -> Result<PathBuf> {
     if !selected.is_empty() { return tool_path(selected); }
-    let local = data_dir()?.parent().unwrap().to_path_buf();
+    let local = local_data_dir()?.parent().unwrap().to_path_buf();
     for folder in [local.join("Programs/SCSKiller/current"), local.join("SCSKiller/current"), local.join("Programs/SCSKiller"), local.join("SCSKiller")] {
         if let Ok(path) = tool_path(&models::path_string(&folder)) { return Ok(path); }
     }
@@ -129,9 +141,13 @@ fn status_from_list(list: &Value, exe: &str) -> Result<Option<GameStatus>> {
     }
     let Some(entry) = matches.first() else { return Ok(None); };
     let id = entry.pointer("/Game/Id").and_then(Value::as_str).filter(|id| valid_id(id)).ok_or("The SCSKiller game identity is invalid.")?.to_owned();
-    let status = entry.get("Status").and_then(Value::as_str).unwrap_or("Unknown").to_owned();
-    Ok(Some(GameStatus { id, can_compile: matches!(status.as_str(), "Ready" | "Stale" | "Warmed"), status,
-        reason: entry.get("StatusReason").and_then(Value::as_str).unwrap_or("Analyze this game again.").into(),
+    let raw_status = entry.get("Status").and_then(Value::as_str).unwrap_or("Unknown");
+    let no_stutter = entry.get("NoStutter").and_then(Value::as_str);
+    let can_compile = matches!(raw_status, "Ready" | "Stale" | "Warmed") && no_stutter.is_none()
+        && !entry.get("NotPlanned").and_then(Value::as_bool).unwrap_or(false)
+        && !entry.get("ShaderModBlocks").and_then(Value::as_bool).unwrap_or(false);
+    Ok(Some(GameStatus { id, can_compile, status: display_status(entry, raw_status).into(),
+        reason: no_stutter.or_else(|| entry.get("StatusReason").and_then(Value::as_str)).unwrap_or("Analyze this game again.").into(),
         engine: entry.pointer("/Engine/Family").and_then(Value::as_str).map(str::to_owned),
         graphics_api: entry.pointer("/Engine/GraphicsApi").and_then(Value::as_str).map(str::to_owned),
         anti_cheat: entry.get("AntiCheat").and_then(Value::as_str).unwrap_or("Unknown").into(),
@@ -145,6 +161,23 @@ fn status_from_list(list: &Value, exe: &str) -> Result<Option<GameStatus>> {
         recorder_note: entry.get("RecorderNote").and_then(Value::as_str).or_else(|| entry.get("RecorderSkip").and_then(Value::as_str)).map(str::to_owned),
     }))
 }
+fn display_status<'a>(entry: &Value, raw: &'a str) -> &'a str {
+    if entry.get("NoStutter").is_some_and(Value::is_string) { return "NoShaderStutter"; }
+    if entry.get("CompileUnreached").and_then(Value::as_bool) == Some(true) { return "CompileUnreached"; }
+    if raw == "Warmed" {
+        // Mirrors upstream's >10% rejected/crashed threshold; unknown historical counts make no claim.
+        let items: u64 = ["Recorded", "Generated", "D3D11Shaders", "MiddlewareItems", "Variants"].iter()
+            .filter_map(|field| entry.get("Plan")?.get(field)?.as_u64()).fold(0, u64::saturating_add);
+        if entry.get("Plan").is_some_and(Value::is_object) && entry.get("LastWarmFailed").and_then(Value::as_u64).is_some_and(|failed|
+            failed.saturating_add(entry.get("LastWarmCrashed").and_then(Value::as_u64).unwrap_or(0)) as f64 > 0.1 * items as f64) {
+            return "PartlyCompiled";
+        }
+        if entry.pointer("/Careful/LaunchCompiled").and_then(Value::as_f64).is_some_and(|share| share > 0.2) { return "PartlyWarmed"; }
+    }
+    if raw == "NeedsRecording" && entry.get("StatusReason").and_then(Value::as_str)
+        == Some("EasyAntiCheat blocks the recorder, but you can record at your own risk with an offline session.") { return "NeedsOfflineSession"; }
+    raw
+}
 fn recording_eligible(entry: &Value) -> bool {
     entry.get("AntiCheat").and_then(Value::as_str) == Some("None")
         && entry.get("Engine").is_some_and(Value::is_object)
@@ -152,14 +185,16 @@ fn recording_eligible(entry: &Value) -> bool {
         && entry.pointer("/Engine/Unsupported").is_some_and(Value::is_null)
         && entry.pointer("/Engine/GraphicsApi").and_then(Value::as_str).is_some_and(|api| api.contains("D3D12"))
         && !entry.get("ShaderModBlocks").and_then(Value::as_bool).unwrap_or(false)
+        && !entry.get("NotPlanned").and_then(Value::as_bool).unwrap_or(false)
+        && !entry.get("NoStutter").is_some_and(Value::is_string)
 }
 fn recording_supported(cli: &Path) -> bool {
     cli.parent().and_then(|dir| read_json(&dir.join("arc-compat.json")).ok().flatten())
         .is_some_and(|manifest| manifest.get("Protocol").and_then(Value::as_u64) == Some(1))
 }
-pub(crate) fn game_status(game: &Game) -> Result<Option<GameStatus>> {
+pub(crate) fn game_status(cli: &Path, game: &Game) -> Result<Option<GameStatus>> {
     if game.console_launch.is_some() { return Ok(None); }
-    read_json(&data_dir()?.join("games.json"))?.map(|list| status_from_list(&list, &game.exe_path)).transpose().map(Option::flatten)
+    read_json(&data_dir(cli)?.join("games.json"))?.map(|list| status_from_list(&list, &game.exe_path)).transpose().map(Option::flatten)
 }
 
 fn install_root(game: &Game) -> Result<PathBuf> {
@@ -195,8 +230,8 @@ fn confirmed_recording_root(list: &Value, game: &Game) -> Result<Option<PathBuf>
     if (root_key == folder_key || root_key.starts_with(&format!("{folder_key}\\"))) && path_key(&game.exe_path).starts_with(&format!("{root_key}\\")) { Ok(Some(root)) }
     else { Err("The previously confirmed folder does not match this Arc installation. Review the game folder in SCSKiller.".into()) }
 }
-fn recording_root(game: &Game) -> Result<PathBuf> {
-    match read_json(&data_dir()?.join("manual-games.json"))? {
+fn recording_root(cli: &Path, game: &Game) -> Result<PathBuf> {
+    match read_json(&data_dir(cli)?.join("manual-games.json"))? {
         Some(list) => confirmed_recording_root(&list, game)?.map(Ok).unwrap_or_else(|| install_root(game)),
         None => install_root(game),
     }
@@ -218,9 +253,9 @@ fn merge_manual(list: &mut Value, game: &Game) -> Result<bool> {
     Ok(true)
 }
 
-fn ensure_manual(game: &Game) -> Result<bool> {
-    if game_status(game)?.is_some_and(|status| !status.id.starts_with("manual:")) { return Ok(false); }
-    let dir = data_dir()?; fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+fn ensure_manual(cli: &Path, game: &Game) -> Result<bool> {
+    if game_status(cli, game)?.is_some_and(|status| !status.id.starts_with("manual:")) { return Ok(false); }
+    let dir = data_dir(cli)?; fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let _lock = ManualLock::acquire(&dir)?;
     let path = dir.join("manual-games.json");
     let mut list = read_json(&path)?.unwrap_or_else(|| json!([]));
@@ -272,19 +307,19 @@ pub(crate) fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action
     let recording_target = if action == Action::PrepareRecording {
         if !recording_supported(cli) { return Err("Recording setup requires the Arc compatibility CLI. See tools/scskiller-compat in the Arc repository.".into()); }
         execute(manager, cli, game, Action::Analyze, false)?;
-        let status = game_status(game)?.ok_or("Analyze this exact game executable before preparing a recording.")?;
+        let status = game_status(cli, game)?.ok_or("Analyze this exact game executable before preparing a recording.")?;
         if !status.can_record { return Err("Recording is unavailable for this build, graphics API or anti-cheat configuration.".into()); }
         if let Some(job) = &mut manager.lock()?.job { job.phase = "PreparingRecording".into(); }
         Some(status.id)
     } else { None };
     let target = if action == Action::Compile {
-        let status = game_status(game)?.ok_or("Analyze this game before compiling.")?;
+        let status = game_status(cli, game)?.ok_or("Analyze this game before compiling.")?;
         if !status.can_compile { return Err(status.reason); } Some(status.id)
     } else { None };
     if manager.lock()?.stopping { return Ok(()); }
     let mut command = Command::new(cli);
     if let Some(id) = &recording_target {
-        command.args(["arc-record", "prepare", id]).arg(models::path_string(&recording_root(game)?));
+        command.args(["arc-record", "prepare", id]).arg(models::path_string(&recording_root(cli, game)?));
     } else if action == Action::Analyze {
         command.arg("scan");
         if !imported { command.arg("--rescan"); }
@@ -352,7 +387,7 @@ pub(crate) fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action
     }
     if action == Action::PrepareRecording {
         execute(manager, cli, game, Action::Analyze, true)?;
-        if !game_status(game)?.is_some_and(|status| status.recorder_installed) {
+        if !game_status(cli, game)?.is_some_and(|status| status.recorder_installed) {
             return Err("Recorder setup did not produce a verified installed recorder. Inspect the operation output.".into());
         }
     }
@@ -362,14 +397,14 @@ pub(crate) fn execute(manager: &Manager, cli: &Path, game: &Game, action: Action
         // Re-evaluate the real driver/cache state before reporting completion to Arc.
         execute(manager, cli, game, Action::Analyze, true)
             .map_err(|error| format!("The compile queue finished, but its status could not refresh: {error}"))?;
-        if !manager.lock()?.stopping && game_status(game)?.is_none_or(|status| status.warmed_at.is_none()) {
+        if !manager.lock()?.stopping && game_status(cli, game)?.is_none_or(|status| status.warmed_at.is_none()) {
             return Err("The queue finished without a verified preparation timestamp. Analyze again and inspect SCSKiller's output.".into());
         }
     }
     if action == Action::Analyze {
-        let status = game_status(game)?;
+        let status = game_status(cli, game)?;
         // Discover store entries first; then repair a suggested manual root or add the missing executable.
-        if !imported && (status.is_none() || status.as_ref().is_some_and(|status| status.id.starts_with("manual:"))) && ensure_manual(game)? {
+        if !imported && (status.is_none() || status.as_ref().is_some_and(|status| status.id.starts_with("manual:"))) && ensure_manual(cli, game)? {
             return execute(manager, cli, game, action, true);
         }
         if status.is_none() { return Err("SCSKiller did not recognize this executable. Only native x64 DirectX games are supported.".into()); }
@@ -385,8 +420,9 @@ pub async fn shader_state(state: State<'_, SharedState>, id: i64) -> Result<Snap
         let runtime = state.shader.lock()?;
         let job = runtime.job.clone();
         let busy = runtime.busy(); drop(runtime);
-        let (game, warning) = match game_status(&game) { Ok(game) => (game, None), Err(error) => (None, Some(error)) };
         let tool = configured_tool(&db::settings(&db)?.shader_tool);
+        let status = match &tool { Ok(cli) => game_status(cli, &game), Err(_) => Ok(None) };
+        let (game, warning) = match status { Ok(game) => (game, None), Err(error) => (None, Some(error)) };
         Ok(Snapshot { installed: tool.is_ok(), recording_supported: tool.is_ok_and(|cli| recording_supported(&cli)), game, job, busy, warning })
     }).await.map_err(|e| e.to_string())?
 }
@@ -473,6 +509,41 @@ mod tests {
             assert_eq!(status_from_list(&list, "D:\\Game.exe").unwrap().unwrap().can_compile, expected);
         }
         assert!(status_from_list(&json!([]), "D:\\Game.exe").is_err());
+    }
+    #[test] fn new_verdicts_and_partial_compiles_do_not_claim_full_preparation() {
+        let mut candidate = entry("steam:1", "D:\\Game.exe", "Warmed");
+        candidate["Plan"] = json!({"Recorded": 100, "Generated": 50, "D3D11Shaders": 25, "MiddlewareItems": 25, "Variants": 100});
+        candidate["LastWarmFailed"] = json!(30); candidate["LastWarmCrashed"] = json!(0);
+        assert_eq!(display_status(&candidate, "Warmed"), "Warmed"); // exactly 10%, not partly
+        candidate["LastWarmCrashed"] = json!(1);
+        assert_eq!(display_status(&candidate, "Warmed"), "PartlyCompiled");
+        candidate["LastWarmFailed"] = Value::Null; candidate["LastWarmSkipped"] = json!(200);
+        assert_eq!(display_status(&candidate, "Warmed"), "Warmed"); // missing/recreated shaders aren't driver rejections
+        candidate["Careful"] = json!({"LaunchCompiled": 0.21});
+        assert_eq!(display_status(&candidate, "Warmed"), "PartlyWarmed");
+        candidate["CompileUnreached"] = json!(true);
+        assert_eq!(display_status(&candidate, "Warmed"), "CompileUnreached");
+        candidate["NoStutter"] = json!("The game precompiles its shaders.");
+        let result = status_from_list(&json!({"Games": [candidate.clone()]}), "D:\\Game.exe").unwrap().unwrap();
+        assert_eq!(result.status, "NoShaderStutter"); assert!(!result.can_compile); assert!(!result.can_record);
+        assert_eq!(result.reason, "The game precompiles its shaders.");
+        candidate["NoStutter"] = Value::Null; candidate["CompileUnreached"] = json!(false); candidate["NotPlanned"] = json!(true);
+        assert!(!status_from_list(&json!({"Games": [candidate]}), "D:\\Game.exe").unwrap().unwrap().can_compile);
+        let mut offline = entry("steam:2", "D:\\Game.exe", "NeedsRecording");
+        offline["AntiCheat"] = json!("EasyAntiCheat");
+        offline["StatusReason"] = json!("EasyAntiCheat blocks the recorder, but you can record at your own risk with an offline session.");
+        assert_eq!(display_status(&offline, "NeedsRecording"), "NeedsOfflineSession"); assert!(!recording_eligible(&offline));
+    }
+    #[test] fn portable_store_switches_only_after_upstreams_atomic_migration_marker() {
+        let (dir, _) = fixture(); let cli = dir.join("current/cli/scskiller.exe");
+        let local = dir.join("shared"); fs::create_dir_all(cli.parent().unwrap()).unwrap();
+        fs::create_dir(dir.join("data")).unwrap(); fs::write(dir.join(".portable"), "").unwrap();
+        assert_eq!(resolved_data_dir(&cli, local.clone()), local);
+        fs::write(dir.join("data/migrated"), "").unwrap();
+        assert_eq!(resolved_data_dir(&cli, local.clone()), dir.join("data"));
+        fs::remove_file(dir.join(".portable")).unwrap();
+        assert_eq!(resolved_data_dir(&cli, local.clone()), local);
+        fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn recorder_requires_explicit_engine_compatibility_and_no_anti_cheat() {
         let mut candidate = entry("manual:abc", "D:\\Game.exe", "Unsupported");
@@ -587,13 +658,13 @@ mod tests {
         let manager = Manager::default();
         manager.lock().unwrap().job = Some(Job { game_id: id, title: game.title.clone(), action: Action::Analyze, running: true, phase: "Analyzing".into(), lines: vec![], error: None, stopped: false });
         execute(&manager, &cli, &game, Action::Analyze, false).unwrap();
-        let status = game_status(&game).unwrap().expect("The executable should be mapped by its actual path");
+        let status = game_status(&cli, &game).unwrap().expect("The executable should be mapped by its actual path");
         println!("Official CLI analysis: {} · {}", game.title, status.status);
         if std::env::var("ARC_SHADER_SMOKE_RECORDING").is_ok_and(|value| value == "1") {
             assert!(status.can_record, "Recording must be compatible with the exact installation");
             manager.lock().unwrap().begin(Job { game_id: id, title: game.title.clone(), action: Action::PrepareRecording, running: true, phase: "Analyzing".into(), lines: vec![], error: None, stopped: false });
             execute(&manager, &cli, &game, Action::PrepareRecording, false).unwrap();
-            assert!(game_status(&game).unwrap().unwrap().recorder_installed);
+            assert!(game_status(&cli, &game).unwrap().unwrap().recorder_installed);
             println!("Arc recording setup verified: {}", game.title);
         }
         if std::env::var("ARC_SHADER_SMOKE_COMPILE").is_ok_and(|value| value == "1") {
@@ -615,7 +686,7 @@ mod tests {
             });
             outcome.unwrap();
             if stop { assert!(manager.lock().unwrap().stopping); println!("Official queue stopped gracefully"); return; }
-            let status = game_status(&game).unwrap().unwrap();
+            let status = game_status(&cli, &game).unwrap().unwrap();
             assert!(status.warmed_at.is_some());
             println!("Official CLI compile: {} · {}", game.title, status.status);
         }

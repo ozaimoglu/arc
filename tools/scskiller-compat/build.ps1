@@ -5,8 +5,8 @@ param(
     [switch]$Install
 )
 $ErrorActionPreference = 'Stop'
-$base = '7d8d6d362852c3427007ea81b06b6901978bef1b'
-$version = '1.2.3-arc.1'
+$base = '7087ff653b0c799d4d9fe26a76e2e26767c0db3b'
+$version = '1.2.4-arc.2'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $work = Join-Path $repo ('.tools/scskiller-build-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
@@ -25,14 +25,14 @@ Run git @('-C', $source, 'apply', (Join-Path $PSScriptRoot 'compat.patch'))
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $out = Join-Path $work 'current'
 $cli = Join-Path $out 'cli'
-Run $DotNet @('test', (Join-Path $source 'tests/SCSKiller.Tests/SCSKiller.Tests.csproj'), '-c', 'Release', '--filter', 'FullyQualifiedName~Carved|FullyQualifiedName~ArcUnreal|FullyQualifiedName~ManualGames|FullyQualifiedName~Anti_cheat_appearing_while_the_recorder')
+Run $DotNet @('test', (Join-Path $source 'tests/SCSKiller.Tests/SCSKiller.Tests.csproj'), '-c', 'Release', '--filter', 'FullyQualifiedName~Carved|FullyQualifiedName~AConfigCue4ParseCantParseDoesNotStopTheMount|FullyQualifiedName~The_portable_build_keeps_its_data_beside_the_exe|FullyQualifiedName~ManualGames|FullyQualifiedName~Anti_cheat_appearing_while_the_recorder')
 Run $DotNet @('publish', (Join-Path $source 'src/SCSKiller.Cli/SCSKiller.Cli.csproj'), '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-o', $cli,
-    "-p:Version=$version", '-p:SourceRevisionId=arc-compat-1', '-p:IncludeSourceRevisionInInformationalVersion=false')
+    "-p:Version=$version", '-p:SourceRevisionId=arc-compat-124-224-224-224-1', '-p:IncludeSourceRevisionInInformationalVersion=false')
 if (-not $PortableArchive) {
     $PortableArchive = Join-Path $work 'upstream-portable.zip'
-    Invoke-WebRequest 'https://github.com/BlueHeisenberg/SCSKiller/releases/download/v1.2.3/SCSKiller-1.2.3-Portable.zip' -OutFile $PortableArchive
+    Invoke-WebRequest 'https://github.com/BlueHeisenberg/SCSKiller/releases/download/v1.2.4/SCSKiller-1.2.4-Portable.zip' -OutFile $PortableArchive
 }
-if ((Get-FileHash -LiteralPath $PortableArchive -Algorithm SHA256).Hash -ne '9535F1C1FAD90A30B82383A0BC8C14EE380C1549DBCFF0ED24638DF617FB3651') { throw 'The upstream portable archive checksum does not match.' }
+if ((Get-FileHash -LiteralPath $PortableArchive -Algorithm SHA256).Hash -ne '7CCB78C0ACCB263BC7DAEB7695E25638570FBCEF636BC50D631BB6C9BD08DA4D') { throw 'The upstream portable archive checksum does not match.' }
 $assets = Join-Path $work 'upstream'
 Expand-Archive -LiteralPath $PortableArchive -DestinationPath $assets
 $native = @(Get-ChildItem -LiteralPath $assets -Directory -Recurse | Where-Object { $_.Name -eq 'native' -and (Test-Path (Join-Path $_.FullName 'scskiller_warm.exe')) })
