@@ -23,6 +23,13 @@ verified the unchanged 100 GB limit with a 52.5 GB upper-bound disk reading. No 
 deletion or new GPU warming was performed. Native screenshot QA and gameplay stutter
 measurements were not performed.
 
+Optional whole-library scans were stopped after extended archive parsing; a complete
+1.2.4 re-audit of all installed games was not established. The five existing gameplay
+recorder installations and their recordings were verified unchanged, rather than
+upgraded in game folders. The CLI's recorder-install command also performs a global
+scan before installing. These limits do not affect the verified tool connection or
+native cache query.
+
 ## v0.1.12 — Shader compatibility and recording preparation (local build)
 
 61 frontend tests, 62 Rust tests, strict TypeScript/Vite bundling, Clippy and schema verification passed. A clean checkout of the pinned SCSKiller source accepted the maintained patch and passed 30 synthetic reader/manual-folder/recorder regression tests before publishing the self-contained compatibility CLI. Its native assets came from the checksum-verified official portable archive.
