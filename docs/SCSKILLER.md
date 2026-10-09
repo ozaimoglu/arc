@@ -1,6 +1,6 @@
 # Shader preparation with SCSKiller
 
-Arc development builds after v0.1.8 can analyze and compile shaders through the **SCSKiller CLI**. Arc 0.1.13 supports official SCSKiller **1.2.4**, older 1.2.3 installations and the optional **1.2.4-arc.2 compatibility CLI**. SCSKiller remains an external installation; its binaries are not bundled in Arc's installer. The separately licensed patch and reproducible build instructions live in [tools/scskiller-compat](../tools/scskiller-compat/README.md).
+Arc 0.1.14 can analyze and compile shaders through the **SCSKiller CLI**. It supports official SCSKiller **1.2.4**, older 1.2.3 installations and the optional **1.2.4-arc.2 compatibility CLI**. SCSKiller remains an external installation; its binaries are not bundled in Arc's installer. The separately licensed patch and reproducible build instructions live in [tools/scskiller-compat](../tools/scskiller-compat/README.md).
 
 ## Connect
 

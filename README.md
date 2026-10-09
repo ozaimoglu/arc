@@ -5,13 +5,13 @@
 <p align="center">
   <a href="https://github.com/ozaimoglu/arc/actions/workflows/windows.yml"><img src="https://github.com/ozaimoglu/arc/actions/workflows/windows.yml/badge.svg" alt="Windows build" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ffd08b?labelColor=1b1b1f" alt="MIT license" /></a>
-  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.8"><img src="https://img.shields.io/badge/release-v0.1.8_preview-ece7de?labelColor=1b1b1f" alt="v0.1.8 preview release" /></a>
+  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.14"><img src="https://img.shields.io/badge/release-v0.1.14_preview-ece7de?labelColor=1b1b1f" alt="v0.1.14 preview release" /></a>
   <img src="https://img.shields.io/badge/platform-Windows_x64-a5a5ae?labelColor=1b1b1f" alt="Windows x64" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/ozaimoglu/arc/releases/download/v0.1.8/Arc_0.1.8_x64-setup.exe"><strong>Download for Windows</strong></a> ·
-  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.8">Release notes</a> ·
+  <a href="https://github.com/ozaimoglu/arc/releases/download/v0.1.14/Arc_0.1.14_x64-setup.exe"><strong>Download for Windows</strong></a> ·
+  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.14">Release notes</a> ·
   <a href="#build-from-source">Build from source</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
@@ -32,7 +32,9 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 | --- | --- |
 | **Find your games** | Recursive folder discovery, Windows EXE metadata and confidence-based filtering of installers, crash handlers and support binaries. |
 | **Put the artwork first** | Portrait covers, cinematic heroes and game logos. Choose alternatives through SteamGridDB or import local PNG/JPEG/WebP artwork. |
+| **One desktop, one design** | A custom Arc title bar with drag-to-move, double-click maximize/restore and window controls that stay available in dialogs. |
 | **Know the scores** | One compact line: **MC 84/7.4 · Steam 87**. Critics, users and Steam positives keep their own scales, colors and source links. |
+| **Prepare before Play** | Optional SCSKiller 1.2.4 shader preparation, live progress, recording setup with the compatibility CLI and driver cache controls. |
 | **Keep it local** | Library, artwork cache, preferences and verified ratings persist locally in SQLite and remain available offline. |
 | **Make it personal** | Favorites, recently played, search, sorting, grid/list views, editable titles, hide/restore and removal exclusions. |
 | **Bring PS4 along** | Extracted PS4 game discovery by CUSA serial, existing shadPS4 launches and compatible Bloodborne BBLauncher setups. |
@@ -41,14 +43,14 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 
 ## Start playing
 
-1. [Download the Windows x64 installer](https://github.com/ozaimoglu/arc/releases/download/v0.1.8/Arc_0.1.8_x64-setup.exe).
+1. [Download the Windows x64 installer](https://github.com/ozaimoglu/arc/releases/download/v0.1.14/Arc_0.1.14_x64-setup.exe).
 2. Open **Settings** and add your game folders.
 3. Add an optional [SteamGridDB API key](https://www.steamgriddb.com/profile/preferences/api) for automatic artwork, or import your own images.
 4. Scan, open a cover and choose **Play**.
 
 The first desktop library starts empty. Automatic ratings require no API key or Chrome extension. Artwork credentials are encrypted with Windows DPAPI. Removing an entry only removes it from Arc; game files remain on disk.
 
-**v0.1.8 is an early preview**, distributed as an unsigned NSIS installer. Windows x64 is the supported release target. Arc does not ship games, ROMs, firmware or an emulator.
+**v0.1.14 is an early preview**, distributed as an unsigned NSIS installer. Windows x64 is the supported release target. Arc does not ship games, ROMs, firmware or an emulator. The library screenshot above was captured on v0.1.8; the custom title bar was introduced in v0.1.14.
 
 ## Scores without the clutter
 
@@ -60,7 +62,7 @@ Matching/parsing logic is adapted from **CriticPeek**; Rust supplies bounded pro
 
 ## Prepare shaders before you play
 
-Source builds after v0.1.8 integrate the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation. Arc 0.1.13 supports **SCSKiller 1.2.4**, including its portable data layout and partial-compilation verdicts. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [compatibility CLI](tools/scskiller-compat/README.md) improves pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
+Arc 0.1.14 integrates the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation and supports **SCSKiller 1.2.4**, including its portable data layout and partial-compilation verdicts. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [compatibility CLI](tools/scskiller-compat/README.md) improves pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. SCSKiller is installed separately and is not bundled in Arc's installer. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
 
 ## Built to be understood
 
@@ -108,7 +110,7 @@ npm run build
 python scripts/check-schema.py
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
-npm run tauri -- build --bundles nsis
+node node_modules/@tauri-apps/cli/tauri.js build --bundles nsis
 ```
 
 Install Clippy with `rustup component add clippy` if needed. Installers are written to `src-tauri/target/release/bundle/nsis/`. `npm run package:win` builds both NSIS and MSI. Windows CI checks the code and uploads a freshly built NSIS artifact.
