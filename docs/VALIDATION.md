@@ -1,5 +1,21 @@
 # Release validation
 
+## v0.1.14 — Custom desktop title bar (local build)
+
+71 frontend tests and 64 Rust tests passed, together with strict TypeScript/Vite
+bundling, Clippy and schema verification. Window-control coverage exercises native
+command routing, action failures, out-of-order maximize-state queries, subscription
+cleanup after unmount and browser-preview gating. The modal regression verifies that
+window controls stay inside the dialog top layer without dismissing its panel.
+
+The frozen Windows x64 NSIS package was installed and restarted as v0.1.14 with a
+responding Arc window. Its executable matches the release artifact; the frozen
+inputs include the changed capability file. SQLite integrity/schema checks and an
+exact pre-install comparison verified preservation of all library, rating, session,
+preference and credential records, including the selected SCSKiller path. The native
+cache query still reports a 100 GB limit. Pixel-level native UI and pointer-interaction
+QA were not performed.
+
 ## v0.1.13 — SCSKiller 1.2.4 update (local build)
 
 66 frontend tests, 64 Rust tests, strict TypeScript/Vite bundling, Clippy and schema

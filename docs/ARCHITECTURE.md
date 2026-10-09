@@ -10,6 +10,19 @@ Arc is a Windows game library built with Tauri 2.12.1, Rust, React, TypeScript, 
 - SQLite is the source of truth. Normal startup reads the database. A detector version upgrade triggers one background rescan of configured folders, then records the version to avoid repeated startup traversal.
 - The browser build is an explicitly labeled preview with eight sample games and localStorage persistence. Desktop starts with an empty SQLite library. Browser scan/launch/artwork operations never pretend to execute native actions.
 
+## Window chrome
+
+The desktop window has no OS title bar. `TitleBar.tsx` uses Arc's existing color and
+icon system, Tauri drag regions and scoped minimize/maximize/close permissions for
+the main window. Resize and focus events keep the restore icon and inactive state
+current. The browser preview omits these controls. Native shadow and resizing remain
+enabled. Implementation follows [Tauri's custom titlebar guide](https://v2.tauri.app/learn/window-customization/).
+
+HTML modal dialogs occupy a transparent viewport-sized host with their centered
+panel and a copy of the title bar inside the modal top layer. This keeps window
+controls interactive while the rest of the library is inert. Escape, backdrop
+dismissal and focus restoration remain part of the dialog behavior.
+
 ## Modules
 
 | Module | Responsibility |

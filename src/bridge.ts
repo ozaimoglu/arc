@@ -1,9 +1,19 @@
 import { demoSnapshot } from './demo';
 import type { Artwork, ArtworkKind, Game, GameMatch, GameRatings, ScanReport, Settings, Snapshot, ShaderSnapshot, ShaderCacheState, ShaderCacheLimit } from './types';
 
-type TauriGlobal = { core: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>; convertFileSrc(path: string): string }; event: { listen(event: string, handler: () => void): Promise<() => void> } };
+export interface DesktopWindow {
+  minimize(): Promise<void>;
+  toggleMaximize(): Promise<void>;
+  close(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  isFocused(): Promise<boolean>;
+  onResized(handler: () => void): Promise<() => void>;
+  onFocusChanged(handler: (event: { payload: boolean }) => void): Promise<() => void>;
+}
+type TauriGlobal = { core: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>; convertFileSrc(path: string): string }; event: { listen(event: string, handler: () => void): Promise<() => void> }; window?: { getCurrentWindow(): DesktopWindow } };
 declare global { interface Window { __TAURI__?: TauriGlobal } }
 export const isDesktop = Boolean(window.__TAURI__);
+export const getDesktopWindow = (): DesktopWindow | null => window.__TAURI__?.window?.getCurrentWindow() ?? null;
 
 function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!window.__TAURI__) return Promise.reject(new Error('This action is available in the Arc desktop app.'));

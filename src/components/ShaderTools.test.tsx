@@ -5,7 +5,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { demoGames } from '../demo';
 import type { ShaderSnapshot } from '../types';
 const bridge = vi.hoisted(() => ({ shaderState: vi.fn(), startShaderJob: vi.fn(), stopShaderJob: vi.fn(), clearShaderCache: vi.fn() }));
-vi.mock('../bridge', () => ({ isDesktop: true, api: bridge }));
+vi.mock('../bridge', () => ({ isDesktop: true, getDesktopWindow: () => null, api: bridge }));
 import ShaderTools from './ShaderTools';
 let root: Root; let host: HTMLDivElement; let snapshot: ShaderSnapshot;
 const configure = vi.fn();

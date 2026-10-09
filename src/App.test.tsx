@@ -6,7 +6,7 @@ import { demoGames } from './demo';
 import type { Game, Snapshot } from './types';
 
 const bridge = vi.hoisted(() => ({ snapshot: vi.fn(), subscribe: vi.fn(), patch: vi.fn(), launch: vi.fn(), shaderState: vi.fn() }));
-vi.mock('./bridge', () => ({ isDesktop: true, imageSrc: (path: string) => path, api: bridge }));
+vi.mock('./bridge', () => ({ isDesktop: true, getDesktopWindow: () => null, imageSrc: (path: string) => path, api: bridge }));
 vi.mock('./ratings/useRatings', () => ({ useRatings: () => false }));
 import App from './App';
 
