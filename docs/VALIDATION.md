@@ -1,5 +1,27 @@
 # Release validation
 
+## v0.1.19 — Windows short-path process tracking
+
+The Windows CI process-image regression exposed a real path comparison issue:
+`QueryFullProcessImageNameW` can retain an executable's 8.3 launch spelling while
+the installation root uses its long path. The failure was reproduced locally
+with a short-path temporary directory and an owned copy of the system ping helper.
+Arc now resolves both the observed image and installation root before comparing
+them. The regression explicitly launches through a short alias when available and
+allows a bounded startup interval before checking presence and disappearance.
+Only the owned helper is stopped; game and store-client files are unchanged.
+
+86 Rust tests passed (two external-tool tests remain opt-in), including the native
+short-path regression, along with strict Clippy across all targets. TypeScript/Vite
+production bundling was rerun with the v0.1.19 package metadata. The frontend logic
+retains v0.1.18's 77-test validation. The separate SCSKiller compatibility workflow
+passed all 706 synthetic tests using the reachable upstream source pin described
+below.
+
+The Windows x64 NSIS release is built from frozen source/configuration inputs.
+This release does not claim additional gameplay acceptance beyond the Sekiro
+confirmation documented for v0.1.18.
+
 ## v0.1.18 — Windows launch path compatibility (local build)
 
 Sekiro's two previous Arc attempts matched Windows Application Error 1000

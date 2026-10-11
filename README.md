@@ -5,13 +5,13 @@
 <p align="center">
   <a href="https://github.com/ozaimoglu/arc/actions/workflows/windows.yml"><img src="https://github.com/ozaimoglu/arc/actions/workflows/windows.yml/badge.svg" alt="Windows build" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ffd08b?labelColor=1b1b1f" alt="MIT license" /></a>
-  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.18"><img src="https://img.shields.io/badge/release-v0.1.18_preview-ece7de?labelColor=1b1b1f" alt="v0.1.18 preview release" /></a>
+  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.19"><img src="https://img.shields.io/badge/release-v0.1.19_preview-ece7de?labelColor=1b1b1f" alt="v0.1.19 preview release" /></a>
   <img src="https://img.shields.io/badge/platform-Windows_x64-a5a5ae?labelColor=1b1b1f" alt="Windows x64" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/ozaimoglu/arc/releases/download/v0.1.18/Arc_0.1.18_x64-setup.exe"><strong>Download for Windows</strong></a> ·
-  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.18">Release notes</a> ·
+  <a href="https://github.com/ozaimoglu/arc/releases/download/v0.1.19/Arc_0.1.19_x64-setup.exe"><strong>Download for Windows</strong></a> ·
+  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.19">Release notes</a> ·
   <a href="#build-from-source">Build from source</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
@@ -44,14 +44,14 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 
 ## Start playing
 
-1. [Download the Windows x64 installer](https://github.com/ozaimoglu/arc/releases/download/v0.1.18/Arc_0.1.18_x64-setup.exe).
+1. [Download the Windows x64 installer](https://github.com/ozaimoglu/arc/releases/download/v0.1.19/Arc_0.1.19_x64-setup.exe).
 2. Open **Settings** and add your game folders.
 3. Add an optional [SteamGridDB API key](https://www.steamgriddb.com/profile/preferences/api) for automatic artwork, or import your own images.
 4. Scan, open a cover and choose **Play**.
 
 The first desktop library starts empty. Automatic ratings require no API key or Chrome extension. Artwork credentials are encrypted with Windows DPAPI. Removing an entry only removes it from Arc; game files remain on disk.
 
-**v0.1.18 is an early preview**, distributed as an unsigned NSIS installer. Windows x64 is the supported release target. Arc does not ship games, ROMs, firmware or an emulator. The library screenshot above was captured on v0.1.8; the custom title bar was introduced in v0.1.14.
+**v0.1.19 is an early preview**, distributed as an unsigned NSIS installer. Windows x64 is the supported release target. Arc does not ship games, ROMs, firmware or an emulator. The library screenshot above was captured on v0.1.8; the custom title bar was introduced in v0.1.14.
 
 ## Scores without the clutter
 

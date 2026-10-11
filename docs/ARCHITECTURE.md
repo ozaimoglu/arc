@@ -117,8 +117,10 @@ establish that Epic can launch that installation. Other binary manifest names an
 unknown Battle.net branches are not guessed as another product.
 
 For these clients, Arc waits up to three minutes for a game image in the matched
-installation before writing play history. Windows Toolhelp/process-image queries
-exclude shared clients, bootstrap wrappers, crash handlers, setup programs and anti-cheat helpers. A
+installation before writing play history. Observed process paths and installation
+roots are resolved to the same filesystem identity, including Windows 8.3 aliases,
+before comparison. Windows Toolhelp/process-image queries exclude shared clients,
+bootstrap wrappers, crash handlers, setup programs and anti-cheat helpers. A
 ten-second absence tolerance covers bootstrap handoffs; an open shared launcher
 does not extend the session. A missing client or start timeout produces an error,
 and Arc never kills a shared store client.

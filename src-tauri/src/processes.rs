@@ -15,6 +15,8 @@ pub fn running(install: &Path) -> Result<bool, String> {
     #[cfg(windows)] {
         use std::mem::size_of;
         use windows_sys::Win32::{Foundation::{CloseHandle, INVALID_HANDLE_VALUE}, System::{Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS}, Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION}}};
+        let install = std::fs::canonicalize(install).unwrap_or_else(|_| install.to_path_buf());
+        let root = PathBuf::from(crate::models::path_string(&install));
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
         if snapshot == INVALID_HANDLE_VALUE { return Err("Windows could not read the running game processes.".into()); }
         let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() }; entry.dwSize = size_of::<PROCESSENTRY32W>() as u32;
@@ -28,10 +30,11 @@ pub fn running(install: &Path) -> Result<bool, String> {
                 if !process.is_null() {
                     let mut buffer = [0_u16; 32768]; let mut size = buffer.len() as u32;
                     if unsafe { QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut size) } != 0 {
-                        let path = PathBuf::from(String::from_utf16_lossy(&buffer[..size as usize]));
-                        // The final path names used for process images do not carry the
-                        // extended-length prefix produced by canonicalize on Windows.
-                        let root = PathBuf::from(crate::models::path_string(install));
+                        let image = PathBuf::from(String::from_utf16_lossy(&buffer[..size as usize]));
+                        // Process image names retain the spelling used at launch, including
+                        // 8.3 aliases. Resolve both sides to the same filesystem identity.
+                        let image = std::fs::canonicalize(&image).unwrap_or(image);
+                        let path = PathBuf::from(crate::models::path_string(&image));
                         found = game_process(&path, &root);
                     }
                     unsafe { CloseHandle(process); }
@@ -99,19 +102,30 @@ mod tests {
     }
     #[cfg(windows)]
     #[test] fn windows_observes_the_game_image_after_a_launcher_command_exits() {
-        use std::{os::windows::process::CommandExt, process::{Command, Stdio}};
+        use std::{os::windows::{ffi::OsStrExt, process::CommandExt}, process::{Command, Stdio}};
+        use windows_sys::Win32::Storage::FileSystem::GetShortPathNameW;
         let root = std::env::temp_dir().join(format!("arc-process-test-{}-{}", std::process::id(), crate::models::now()));
         std::fs::create_dir_all(&root).unwrap();
         let image = root.join("ActualGame.exe");
         let system = PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/ping.exe");
         std::fs::copy(system, &image).unwrap();
+        let input: Vec<u16> = image.as_os_str().encode_wide().chain(Some(0)).collect();
+        let mut output = [0_u16; 32768];
+        let length = unsafe { GetShortPathNameW(input.as_ptr(), output.as_mut_ptr(), output.len() as u32) } as usize;
+        let image = if length > 0 && length < output.len() { PathBuf::from(String::from_utf16_lossy(&output[..length])) } else { image };
         let mut child = Command::new(&image).args(["-n", "20", "127.0.0.1"]).creation_flags(0x08000000).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
         let install = std::fs::canonicalize(&root).unwrap();
-        let result = running(&install);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut result = running(&install);
+        while result.as_ref().is_ok_and(|present| !present) && Instant::now() < deadline && child.try_wait().unwrap().is_none() {
+            std::thread::sleep(Duration::from_millis(20));
+            result = running(&install);
+        }
+        let status = child.try_wait().unwrap();
         let _ = child.kill(); let _ = child.wait();
         let stopped = running(&install);
         std::fs::remove_dir_all(&root).unwrap();
-        assert!(result.unwrap()); assert!(!stopped.unwrap());
+        assert!(result.unwrap(), "image={}, install={}, status={status:?}", image.display(), install.display()); assert!(!stopped.unwrap());
     }
     #[test] fn sessions_wait_for_real_game_start_and_survive_bootstrap_gaps() {
         let seconds = Duration::from_secs; let mut monitor = Monitor::default();
