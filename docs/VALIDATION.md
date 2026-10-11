@@ -1,5 +1,143 @@
 # Release validation
 
+## v0.1.18 — Windows launch path compatibility (local build)
+
+Sekiro's two previous Arc attempts matched Windows Application Error 1000
+events with exception `0xc0000005`; the selected executable and working directory
+were correct. A native child-process probe reproduced the Windows verbatim prefix
+in the previous command's `argv[0]`. `Plan::command` now supplies ordinary Windows
+program and working-directory paths only when they resolve to the same validated
+canonical identity. Store selection, process tracking and argument boundaries remain
+unchanged. The footer reads the package version instead of a stale literal.
+
+86 Rust tests passed (two external-tool tests remain opt-in), along with 77 frontend
+tests, strict Clippy across all targets, TypeScript/Vite bundling and the SQLite
+migration check. A Windows child-process regression observes the real command line
+and working directory with a spaced Unicode path. The read-only plan audit checked
+ordinary command paths for all 47 visible available records, including Sekiro.
+
+The Windows x64 NSIS package (3.48 MiB) was installed over v0.1.17 after a SQLite
+backup and a check that no Arc-tracked session was active. Installed executable
+identity, SQLite integrity, foreign keys and complete library/history/preference/
+credential preservation passed; existing rating identities were retained. Arc
+restarted as v0.1.18 and responded.
+
+After the user's manually started Sekiro session had ended, a single native
+diagnostic used the exact validated `Plan::command` source to start its unchanged
+EXE. It remained running beyond the previous startup failure interval (20 seconds),
+with no new matching crash event; the user confirmed that it worked. The diagnostic
+left the game running. Arc's UI Play interaction and further gameplay were not
+automated, and no game binaries, saves, shader recorders or caches were changed
+by the fix.
+
+## SCSKiller 1.2.5 — Local tool upgrade
+
+The optional compatibility CLI was rebased onto upstream commit
+`bf2571af3db4d1d3c49aeb05cda170571eae0704` and installed as **1.2.5-arc.1**.
+706 synthetic upstream/Arc regressions passed. Tests with external game/GPU
+prerequisites were excluded; the synthetic CSV fixtures use invariant culture on
+non-English Windows, without changing the published CLI's culture. Upstream
+compiler/analyzer warnings remain. The official 1.2.5 portable SHA-256 was
+verified, and installed CLI/native/license assets match the validated build.
+
+Arc's opt-in read-only native cache adapter test passed against the new CLI on
+the RTX 4090. It reported up to 53 GB on disk and retained the 100 GB driver limit.
+No GPU warm, cache cleanup, driver-setting mutation or game launch was performed
+for this upgrade. Arc stayed open during the existing AION 2 session; its tool
+preference now points to the new installation.
+
+The previously enabled 007 First Light, CONTROL Resonant, Resident Evil 4 and
+Witcher 3 recorder DLLs were updated through upstream's installer and matched to
+the verified official 1.2.5 native recorder. Upstream refused Requiem's recorder
+because DLSS on NVIDIA loads DirectX 12 before it can, and removed the incompatible
+proxy. That guard was retained; gameplay recording was not captured.
+
+Backups and SQLite integrity/schema comparisons verified preservation of the
+library, rating identities, preferences and encrypted credentials. Active-session
+history remained live. SCSKiller's existing game identities, preparation history,
+manual metadata and global settings were preserved.
+
+Upstream imported Witcher 3's existing raw recorder database into its compact
+shared-store format (1,845,590 to 671,918 bytes). Reading both files through the
+new CLI's `PsoDb.Read` produced the same 1,591 records in the same order, with
+identical framed-content SHA-256 and no missing records. The original game-side
+inbox was emptied only after this verified import; its pre-upgrade backup remains.
+
+## v0.1.17 — Other launcher routing (local build)
+
+77 frontend tests and 85 Rust tests passed (two opt-in external-tool tests remain
+ignored). TypeScript/Vite production bundling, strict Clippy across all targets
+and the independent SQLite migration check passed. New coverage includes Riot
+product/install associations with stale metadata, Epic local catalogue records,
+compressed/uncompressed binary manifest integrity and bounds, EA offer identities,
+Ubisoft/GOG numeric IDs, Rockstar argument quoting, Battle.net Agent-to-client IDs
+and bounded protobuf parsing. Process tests reject shared clients, bootstrap wrappers,
+helpers and neighboring installations, and cover delayed starts and handoff gaps.
+
+A Windows runtime test copied the system ping executable into an owned temporary
+installation, started it hidden and confirmed that process-image queries observe
+its presence and disappearance independently of a shared client. Only that test
+helper was terminated; no installed game or store client was launched or stopped.
+
+The read-only native plan audit verified all 49 visible available library records:
+12 Steam, three Riot, two Epic, one NTTGame and 31 standalone/console routes. Existing
+LoL, Runeterra and VALORANT entries resolve to their associated Riot Client; GTA V
+Enhanced resolves to its full installed Epic catalogue identity; Knight Online
+resolves to its own launcher. Fortnite's missing global Epic registration falls
+back to its integrity-checked local binary manifest, verified bootstrapper and
+known catalogue alias. That route does not restore Epic's own registration.
+
+The frozen Windows x64 NSIS package (3.48 MiB) was installed over v0.1.16 and
+Arc restarted as v0.1.17 with a responding main window. It includes the automatic
+rating-refresh changes from v0.1.16. The installed executable matches the release
+artifact. A pre-install SQLite backup and complete table/schema comparison verified
+that every library, rating, history, preference and encrypted credential record was
+preserved; integrity and foreign-key checks passed. Game/store files and their
+installation records were unchanged. Native screenshot QA was not performed.
+
+Actual gameplay/client acceptance was not observed, including Fortnite's Epic
+launch. EA, Ubisoft, Battle.net, Rockstar standalone and GOG arguments were checked
+against primary implementations and synthetic identities; the current visible
+library has no live installation using those routes. Unknown/new launcher record
+formats and inaccessible elevated game processes can still prevent tracking.
+
+## v0.1.16 — Automatic rating refresh (local build)
+
+77 frontend tests and 70 Rust tests passed (two opt-in external-tool tests remain
+ignored), along with TypeScript/Vite production bundling, Clippy with warnings
+denied and SQLite schema verification. Rating regressions cover the exact
+72-hour boundary, repeated refreshes in an open session, resume after a clock
+jump, manual-refresh scheduling, hidden-game exclusion, request ordering,
+offline backoff and timer/listener cleanup. Existing provider-cache entries with
+a seven-day stored expiry respect the new 72-hour score lifetime.
+
+The isolated Windows x64 NSIS build retains the previously installed Steam
+launch behavior; concurrent work on additional store routes was excluded. It
+was installed and restarted as v0.1.16. Frozen inputs and the installed executable
+were verified. A SQLite backup, integrity/foreign-key checks and table comparison
+confirmed preservation of the library, history, preferences, encrypted credentials
+and schema. Existing rating snapshots were retained; overdue score/cache updates
+are expected after startup. Native screenshot QA was not performed.
+
+## v0.1.15 — Steam launch routing (local build)
+
+71 frontend tests and 70 Rust tests passed (two opt-in external-tool tests remain
+ignored). TypeScript/Vite bundling, Clippy with warnings denied and schema verification passed. Regression
+coverage includes validated installed App IDs, nested/exact Steam scan roots,
+existing library records, escaped/nested manifest fields, local SDK IDs retaining
+the native route, delayed starts, cancellation timeouts and launcher handoffs.
+
+The read-only native launch diagnostic verified all 12 visible installed Steam
+records route through Steam without a rescan. The existing AION 2 entry on F:
+resolves to the registered Steam client on C: with `-applaunch 3393110`.
+Gameplay and the game's own client startup have not been observed in this check.
+
+The frozen Windows x64 NSIS build was installed and Arc restarted as v0.1.15 with
+a live main window. Its installed executable matches the packaged release build.
+A pre-install SQLite backup and complete table comparison verified that the
+library, ratings, sessions, settings, credentials and schema remain identical;
+SQLite integrity and foreign-key checks passed.
+
 ## v0.1.14 — Custom desktop title bar (local build)
 
 71 frontend tests and 64 Rust tests passed, together with strict TypeScript/Vite
@@ -111,7 +249,7 @@ Existing regressions cover missing versus zero scores, correct per-scale colors,
 
 ## Limits
 
-Startup and memory goals have not been benchmarked. MSI is available as a source build target, but the downloadable release is NSIS. Real-game gameplay/long-session stability and pixel-level native UI QA are not established by unit tests or launch-plan checks. Playtime tracks the directly launched process; launcher handoffs and descendants remain a roadmap item.
+Startup and memory goals have not been benchmarked. MSI is available as a source build target, but the downloadable release is NSIS. Real-game gameplay/long-session stability and pixel-level native UI QA are not established by unit tests or launch-plan checks. Steam sessions follow the client's per-app flag; supported store routes observe installation-scoped game images. Standalone/console sessions track the directly launched process. Closing Arc still interrupts tracking, and unusual clients/installation records may require additional support.
 
 Artwork and ratings rely on independent services and can be unavailable or rate-limited. Cached data remains usable. Detection is heuristic and unusual installations may require user correction.
 

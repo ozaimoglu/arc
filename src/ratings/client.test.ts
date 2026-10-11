@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../bridge', () => ({ api: { ratingsCacheRead: vi.fn(), ratingsCacheWrite: vi.fn() } }));
 import criticHtml from './fixtures/metacritic.html?raw';
 import userHtml from './fixtures/metacritic-users.html?raw';
-import { hasRatings, ratingsDue, retainRatings } from './client';
+import { hasRatings, ratingsDue, retainRatings, RATINGS_TTL_MS } from './client';
 import type { GameRatings } from '../types';
 
 const title = 'FINAL FANTASY TACTICS - The Ivalice Chronicles';
@@ -58,9 +58,9 @@ describe('CriticPeek identity and platform parsers reused by Arc', () => {
     await service.lookup({ title }); expect(count).toBe(2);
     expect(Object.keys(storage.data).every(key => key.startsWith('score:v2:ps4:'))).toBe(true);
   });
-  it('deduplicates requests, verifies embedded Steam identity and reuses 7-day SQLite-shaped entries', async () => {
+  it('deduplicates requests and expires even legacy seven-day cache entries at 72 hours', async () => {
     const storage = memory(); let count = 0, now = 1000;
-    const service = CriticScoresService.createService({ storage, interval: 0, now: () => now, fetchImpl: async input => {
+    const service = CriticScoresService.createService({ storage, interval: 0, ratingTtlMs: RATINGS_TTL_MS, now: () => now, fetchImpl: async input => {
       const url = String(input); count++;
       if (url.includes('storesearch')) return Response.json({ items: [{ id: 100, name: title, type: 'app' }] });
       if (url.includes('appdetails')) return Response.json({ differentKey: { success: true, data: { steam_appid: 100, type: 'game', name: title, metacritic: { score: 87, url: `https://www.metacritic.com/game/pc/${metaTitle}` } } } });
@@ -71,7 +71,9 @@ describe('CriticPeek identity and platform parsers reused by Arc', () => {
     expect(a).toEqual(b); expect(a.steam?.percent).toBe(90); expect(a.metacritic?.userScore).toBe(6.5);
     expect(a.metacritic?.url).toBe(`https://www.metacritic.com/game/${metaTitle}/?platform=pc`);
     expect(count).toBe(4);
-    now += 7 * 86400000 - 1; await service.lookup({ title }); expect(count).toBe(4);
+    // A pre-upgrade record's stored expiry must not extend the new score lifetime.
+    (storage.data['score:v2:app:100'] as { expires: number }).expires = now + 7 * 86400000;
+    now += 72 * 3600000 - 1; await service.lookup({ title }); expect(count).toBe(4);
     now++; await service.lookup({ title }); expect(count).toBe(8);
   });
   it('honors a provider 429 cooldown across games without retrying aggressively', async () => {
@@ -83,10 +85,10 @@ describe('CriticPeek identity and platform parsers reused by Arc', () => {
 });
 
 describe('rating freshness and offline preservation', () => {
-  it('uses 7 days for ratings, one hour for missing ratings, one minute for failures', () => {
+  it('uses 72 hours for ratings, one hour for missing ratings, one minute for failures', () => {
     const value = saved();
-    expect(ratingsDue(value, 1000 + 7 * 86400000 - 1)).toBe(false);
-    expect(ratingsDue(value, 1000 + 7 * 86400000)).toBe(true);
+    expect(ratingsDue(value, 1000 + 72 * 3600000 - 1)).toBe(false);
+    expect(ratingsDue(value, 1000 + 72 * 3600000)).toBe(true);
     expect(hasRatings({ ...value, status: 'unverified' })).toBe(false);
     value.steam = null; value.metacritic = null; value.status = 'not-found';
     expect(ratingsDue(value, 3601000)).toBe(true); expect(ratingsDue(value, 61000)).toBe(false);

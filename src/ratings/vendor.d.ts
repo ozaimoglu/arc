@@ -10,7 +10,7 @@ declare global {
     parseMetacriticUser(html: string, title: string, platform?: string): { score: number; url: string; platform: string } | null;
   };
   var CriticScoresService: {
-    createService(options: { storage: { get(key: string): Promise<Record<string, unknown>>; set(values: Record<string, unknown>): Promise<void> }; fetchImpl?: typeof fetch; platform?: string; interval?: number; now?: () => number }): {
+    createService(options: { storage: { get(key: string): Promise<Record<string, unknown>>; set(values: Record<string, unknown>): Promise<void> }; fetchImpl?: typeof fetch; platform?: string; interval?: number; now?: () => number; ratingTtlMs?: number }): {
       lookup(input: { title: string; appId?: number | null; force?: boolean }): Promise<GameRatings>;
     };
   };

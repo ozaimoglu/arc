@@ -1,8 +1,27 @@
 use std::path::PathBuf;
-use crate::{models::{path_string, ConsoleLaunch, Game}, ps4};
+use crate::{models::{path_string, ConsoleLaunch, Game}, ps4, steam, stores};
 
 #[derive(Debug)]
-pub struct Plan { pub program: PathBuf, pub args: Vec<String>, pub directory: PathBuf }
+pub struct Plan { pub program: PathBuf, pub args: Vec<String>, pub directory: PathBuf, pub steam_app_id: Option<u32>, pub store: Option<stores::Store>, pub tracked_directory: Option<PathBuf> }
+
+// Canonical paths remain the validation/tracking identity. The Windows verbatim
+// prefix must not leak into argv[0]: some game runtimes cannot parse it. Only use
+// the ordinary spelling when it resolves to the exact same validated path.
+fn application_path(path: &std::path::Path) -> PathBuf {
+    #[cfg(windows)] {
+        let compatible = PathBuf::from(path_string(path));
+        if compatible == path || std::fs::canonicalize(&compatible).is_ok_and(|resolved| resolved == path) { return compatible; }
+    }
+    path.to_path_buf()
+}
+
+impl Plan {
+    pub fn command(&self) -> std::process::Command {
+        let mut command = std::process::Command::new(application_path(&self.program));
+        command.args(&self.args).current_dir(application_path(&self.directory));
+        command
+    }
+}
 
 fn executable(path: &str, expected_name: Option<&str>) -> Result<PathBuf, String> {
     let path = std::fs::canonicalize(path).map_err(|_| "The game or emulator executable is missing. Scan your library to refresh it.".to_string())?;
@@ -14,6 +33,18 @@ fn executable(path: &str, expected_name: Option<&str>) -> Result<PathBuf, String
 }
 
 pub fn plan(game: &Game) -> Result<Plan, String> {
+    if game.console_launch.is_none() {
+        let game_exe = executable(&game.exe_path, None)?;
+        if let Some(installation) = steam::installation(&game_exe) {
+            let program = steam::client(&installation)?;
+            let directory = program.parent().ok_or("Steam has no parent folder.")?.to_path_buf();
+            return Ok(Plan { program, args: vec!["-applaunch".into(), installation.app_id.to_string()], directory, steam_app_id: Some(installation.app_id), store: None, tracked_directory: None });
+        }
+        if let Some(route) = stores::route(&game_exe)? {
+            let directory = route.program.parent().ok_or("The launcher has no parent folder.")?.to_path_buf();
+            return Ok(Plan { program: route.program, args: route.args, directory, steam_app_id: None, store: Some(route.store), tracked_directory: Some(route.install) });
+        }
+    }
     let (program, args) = if let Some(launch) = &game.console_launch {
         if game.source != ps4::SOURCE { return Err("The PS4 launch record is invalid. Scan your library again.".into()); }
         let eboot = std::fs::canonicalize(&game.exe_path).map_err(|_| "The PS4 game file is missing.".to_string())?;
@@ -36,7 +67,7 @@ pub fn plan(game: &Game) -> Result<Plan, String> {
         }
     } else { (executable(&game.exe_path, None)?, vec![]) };
     let directory = program.parent().ok_or("The executable has no parent folder.")?.to_path_buf();
-    Ok(Plan { program, args, directory })
+    Ok(Plan { program, args, directory, steam_app_id: None, store: None, tracked_directory: None })
 }
 
 #[cfg(test)]
@@ -95,6 +126,56 @@ mod tests {
         let candidate = Candidate { title: "Native".into(), exe_path: path_string(&root.join("native.exe")), folder: path_string(&root), score: 100, console_launch: None };
         let (id, _) = db::upsert(&db, &candidate).unwrap().unwrap();
         assert!(plan(&db::game(&db, id).unwrap()).unwrap().args.is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(windows)]
+    #[test] fn windows_child_receives_an_ordinary_executable_path_and_the_game_directory() {
+        use std::os::windows::process::CommandExt;
+        let root = std::env::temp_dir().join(format!("arc-launch spaced-İ-{}-{}", std::process::id(), crate::models::now()));
+        std::fs::create_dir_all(&root).unwrap();
+        let program = PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        let plan = Plan {
+            program: std::fs::canonicalize(program).unwrap(),
+            args: ["-NoProfile", "-NonInteractive", "-Command", "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); [pscustomobject]@{ CommandLine = [Environment]::CommandLine; Directory = [Environment]::CurrentDirectory } | ConvertTo-Json -Compress"].map(str::to_owned).to_vec(),
+            directory: std::fs::canonicalize(&root).unwrap(),
+            steam_app_id: None, store: None, tracked_directory: None,
+        };
+        let mut command = plan.command();
+        assert_eq!(std::fs::canonicalize(command.get_program()).unwrap(), plan.program);
+        assert_eq!(std::fs::canonicalize(command.get_current_dir().unwrap()).unwrap(), plan.directory);
+        let output = command.creation_flags(0x08000000).output().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        // Use explicit UTF-8 so the Unicode-path check is independent of the
+        // Windows console code page.
+        let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(!value["CommandLine"].as_str().unwrap().contains("\\\\?\\"));
+        assert_eq!(value["Directory"].as_str().unwrap(), path_string(&plan.directory));
+    }
+    #[test] fn steam_launches_use_the_installed_id_even_for_existing_nested_library_records() {
+        let (root, db, id) = fixture("steam-route");
+        let install = root.join("Steam/steamapps/common/Game with spaces");
+        let exe = install.join("Binaries/Win64/game.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"fixture").unwrap();
+        std::fs::write(root.join("Steam/steam.exe"), b"client fixture").unwrap();
+        let manifest = root.join("Steam/steamapps/appmanifest_3393110.acf");
+        std::fs::write(&manifest, "\"AppState\" { \"appid\" \"3393110\" \"name\" \"Installed game\" \"installdir\" \"Game with spaces\" }").unwrap();
+        let mut game = db::game(&db, id).unwrap();
+        game.console_launch = None; game.exe_path = path_string(&exe);
+        // Older records, edited titles and catalogue IDs do not define launch identity.
+        game.folder = path_string(&root); game.title = "Custom title".into(); game.sgdb_id = Some(999);
+        let steam = plan(&game).unwrap();
+        assert_eq!(steam.steam_app_id, Some(3393110));
+        assert_eq!(steam.args, ["-applaunch", "3393110"]);
+        assert!(steam.program.file_name().unwrap().eq_ignore_ascii_case("steam.exe"));
+        assert_ne!(steam.program, std::fs::canonicalize(&exe).unwrap());
+        // A local SDK ID is not proof that Steam owns this installation.
+        std::fs::remove_file(manifest).unwrap();
+        std::fs::write(exe.parent().unwrap().join("steam_appid.txt"), "3393110").unwrap();
+        let native = plan(&game).unwrap();
+        assert!(native.steam_app_id.is_none()); assert!(native.args.is_empty());
+        assert_eq!(native.program, std::fs::canonicalize(&exe).unwrap());
         std::fs::remove_dir_all(root).unwrap();
     }
 }

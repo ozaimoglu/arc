@@ -5,13 +5,13 @@
 <p align="center">
   <a href="https://github.com/ozaimoglu/arc/actions/workflows/windows.yml"><img src="https://github.com/ozaimoglu/arc/actions/workflows/windows.yml/badge.svg" alt="Windows build" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ffd08b?labelColor=1b1b1f" alt="MIT license" /></a>
-  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.14"><img src="https://img.shields.io/badge/release-v0.1.14_preview-ece7de?labelColor=1b1b1f" alt="v0.1.14 preview release" /></a>
+  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.18"><img src="https://img.shields.io/badge/release-v0.1.18_preview-ece7de?labelColor=1b1b1f" alt="v0.1.18 preview release" /></a>
   <img src="https://img.shields.io/badge/platform-Windows_x64-a5a5ae?labelColor=1b1b1f" alt="Windows x64" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/ozaimoglu/arc/releases/download/v0.1.14/Arc_0.1.14_x64-setup.exe"><strong>Download for Windows</strong></a> ·
-  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.14">Release notes</a> ·
+  <a href="https://github.com/ozaimoglu/arc/releases/download/v0.1.18/Arc_0.1.18_x64-setup.exe"><strong>Download for Windows</strong></a> ·
+  <a href="https://github.com/ozaimoglu/arc/releases/tag/v0.1.18">Release notes</a> ·
   <a href="#build-from-source">Build from source</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
@@ -20,7 +20,7 @@
 
 Turn folders of installed games into a library worth opening. Arc brings cinematic artwork, critic and user ratings, and a direct Play action to your Windows desktop.
 
-Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and keeps scanning, persistence and game launching in Rust. The current Windows installer is about **3.4 MiB**; WebView2 is provided by the system or installed separately by its bootstrapper.
+Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and keeps scanning, persistence and game launching in Rust. The current Windows installer is about **3.5 MiB**; WebView2 is provided by the system or installed separately by its bootstrapper.
 
 ## A library that feels like yours
 
@@ -33,8 +33,9 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 | **Find your games** | Recursive folder discovery, Windows EXE metadata and confidence-based filtering of installers, crash handlers and support binaries. |
 | **Put the artwork first** | Portrait covers, cinematic heroes and game logos. Choose alternatives through SteamGridDB or import local PNG/JPEG/WebP artwork. |
 | **One desktop, one design** | A custom Arc title bar with drag-to-move, double-click maximize/restore and window controls that stay available in dialogs. |
+| **Launch the right installation** | Installed Steam games use Steam; supported store registrations use their own clients. Standalone games use validated EXE paths with Windows path compatibility. |
 | **Know the scores** | One compact line: **MC 84/7.4 · Steam 87**. Critics, users and Steam positives keep their own scales, colors and source links. |
-| **Prepare before Play** | Optional SCSKiller 1.2.4 shader preparation, live progress, recording setup with the compatibility CLI and driver cache controls. |
+| **Prepare before Play** | Optional SCSKiller 1.2.5 shader preparation, live progress, recording setup with the compatibility CLI and driver cache controls. |
 | **Keep it local** | Library, artwork cache, preferences and verified ratings persist locally in SQLite and remain available offline. |
 | **Make it personal** | Favorites, recently played, search, sorting, grid/list views, editable titles, hide/restore and removal exclusions. |
 | **Bring PS4 along** | Extracted PS4 game discovery by CUSA serial, existing shadPS4 launches and compatible Bloodborne BBLauncher setups. |
@@ -43,26 +44,26 @@ Built with **Tauri 2, Rust, React and SQLite**, Arc uses Windows WebView2 and ke
 
 ## Start playing
 
-1. [Download the Windows x64 installer](https://github.com/ozaimoglu/arc/releases/download/v0.1.14/Arc_0.1.14_x64-setup.exe).
+1. [Download the Windows x64 installer](https://github.com/ozaimoglu/arc/releases/download/v0.1.18/Arc_0.1.18_x64-setup.exe).
 2. Open **Settings** and add your game folders.
 3. Add an optional [SteamGridDB API key](https://www.steamgriddb.com/profile/preferences/api) for automatic artwork, or import your own images.
 4. Scan, open a cover and choose **Play**.
 
 The first desktop library starts empty. Automatic ratings require no API key or Chrome extension. Artwork credentials are encrypted with Windows DPAPI. Removing an entry only removes it from Arc; game files remain on disk.
 
-**v0.1.14 is an early preview**, distributed as an unsigned NSIS installer. Windows x64 is the supported release target. Arc does not ship games, ROMs, firmware or an emulator. The library screenshot above was captured on v0.1.8; the custom title bar was introduced in v0.1.14.
+**v0.1.18 is an early preview**, distributed as an unsigned NSIS installer. Windows x64 is the supported release target. Arc does not ship games, ROMs, firmware or an emulator. The library screenshot above was captured on v0.1.8; the custom title bar was introduced in v0.1.14.
 
 ## Scores without the clutter
 
 `MC 84/7.4 · Steam 87` means **critics 84/100**, **users 7.4/10** and **87% positive Steam reviews**. A dash means unavailable; it is never a fabricated zero.
 
-Details show the source, platform and scales. PS4 entries use PS4 Metacritic ratings. Steam results include all languages and purchase types, including off-topic reviews. Verified scores are cached for seven days and remain visible offline. Use **Refresh ratings** or **Correct game match** with a Steam URL/App ID when needed.
+Details show the source, platform and scales. PS4 entries use PS4 Metacritic ratings. Steam results include all languages and purchase types, including off-topic reviews. Verified scores refresh automatically every **72 hours** while Arc is open; overdue checks run on the next launch or resume. Saved scores remain visible offline. Use **Refresh ratings** or **Correct game match** with a Steam URL/App ID when needed.
 
 Matching/parsing logic is adapted from **CriticPeek**; Rust supplies bounded provider requests and SQLite storage. No Chrome runtime is required. See [rating architecture](docs/ARCHITECTURE.md#game-ratings) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Prepare shaders before you play
 
-Arc 0.1.14 integrates the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation and supports **SCSKiller 1.2.4**, including its portable data layout and partial-compilation verdicts. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [compatibility CLI](tools/scskiller-compat/README.md) improves pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. SCSKiller is installed separately and is not bundled in Arc's installer. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
+Arc integrates the optional [SCSKiller](https://github.com/BlueHeisenberg/SCSKiller) installation and supports **SCSKiller 1.2.5**, including its portable data layout and partial-compilation verdicts. Connect it in Settings, open a native game's details, then **Analyze game → Compile shaders**. Arc shows verified support reasons, live stages and a graceful Stop action. Settings also shows driver cache usage and NVIDIA size controls; a game's details offers confirmed per-game cleanup. The optional [1.2.5-arc.1 compatibility CLI](tools/scskiller-compat/README.md) preserves Arc's pipeline-cache detection and enables **Prepare recording → Play → Analyze again** for compatible games. Its matching native tools include upstream's ray tracing progress, compile priority and recorder fixes. SCSKiller is installed separately and is not bundled in Arc's installer. shadPS4 uses its own cache. [Setup and integration details](docs/SCSKILLER.md).
 
 ## Built to be understood
 
@@ -126,7 +127,7 @@ The first version focuses on local discovery, artwork, ratings and launching. Th
 - [ ] Artwork cache pruning
 - [ ] Broader emulator and ROM support
 
-These are planned directions, not shipped features. Native game detection is heuristic; unusual installations may need a title edit or a matching fix. Session timing currently tracks the directly launched process.
+These are planned directions, not shipped features. Native game detection is heuristic; unusual installations may need a title edit or a matching fix. Installed Steam games launch through Steam and follow its per-game running state. Locally registered Epic, Riot, EA, Ubisoft, Battle.net, Rockstar and GOG installations route through their owning clients; Knight Online uses its own launcher. Their sessions follow game processes within the registered installation, excluding shared clients. Standalone and console sessions track the directly launched process. See [launching details and limits](docs/ARCHITECTURE.md#other-store-launching).
 
 ## Help build Arc
 

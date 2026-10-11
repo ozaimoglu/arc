@@ -7,6 +7,7 @@ Arc is a Windows game library built with Tauri 2.12.1, Rust, React, TypeScript, 
 - React owns navigation, filtering, artwork selection and presentation.
 - Rust owns directory traversal, EXE metadata, persistence, credentials, artwork downloads and process launch.
 - The frontend passes a database game ID to launch/open-folder commands. It cannot submit a shell command or an arbitrary executable path.
+- Launch validation and tracking retain canonical file identity. On Windows, the process command uses ordinary executable and working-directory paths only when they resolve to that same identity. This keeps `\\?\` out of `argv[0]` for games that cannot parse Rust's [extended-length canonical paths](https://doc.rust-lang.org/std/fs/fn.canonicalize.html), without changing the selected executable or argument boundaries.
 - SQLite is the source of truth. Normal startup reads the database. A detector version upgrade triggers one background rescan of configured folders, then records the version to avoid repeated startup traversal.
 - The browser build is an explicitly labeled preview with eight sample games and localStorage persistence. Desktop starts with an empty SQLite library. Browser scan/launch/artwork operations never pretend to execute native actions.
 
@@ -31,6 +32,9 @@ dismissal and focus restoration remain part of the dialog behavior.
 | `metadata.rs` | Read Windows ProductName/FileDescription without loading the executable |
 | `ps4.rs` | Bounded PS4 SFO reader, base-game/serial detection and existing shadPS4/BBLauncher discovery |
 | `launch.rs` | Validate native or console launch records and build program/argument/working-directory plans |
+| `steam.rs` | Match installed AppState manifests, locate Steam and observe per-app session state |
+| `stores.rs`, `registry.rs`, `launcher_metadata.rs` | Resolve store-owned installations using bounded local records and validated client paths |
+| `processes.rs` | Observe game images within their registered installation across launcher handoffs |
 | `db.rs` and `migrations/001_initial.sql` | Library, preferences, ignored executables and process sessions |
 | `artwork.rs` | SteamGridDB search, conservative match ranking, grid/hero/logo selection and bounded image cache |
 | `ratings.rs` | Provider URL/redirect allowlists, bounded HTTP responses, typed ratings validation, local Steam identity and isolated SQLite rating storage |
@@ -48,7 +52,7 @@ dismissal and focus restoration remain part of the dialog behavior.
 
 Removing a library entry adds the executable to `ignored_executables` in the same transaction. Later scans cannot re-add it. Hiding preserves the game and makes it available in Hidden games. No game files are deleted.
 
-`sessions` stores the start/end of the directly launched process. On clean process exit, elapsed whole minutes are added to playtime. Session and last-played writes are transactional. Pending sessions from a previous launcher crash are closed without estimating playtime. Playtime is basic process tracking: launcher handoffs, descendants and closing Arc while a game runs are not tracked reliably in v1.
+`sessions` stores the observed start/end of a game. Steam uses its per-app running flag; other supported store routes observe process images within the registered game installation. Standalone and console routes track the directly launched process. On successful session completion, elapsed whole minutes are added to playtime. Session and last-played writes are transactional. Pending sessions from a previous Arc crash are closed without estimating playtime. Closing Arc while a game runs still interrupts tracking.
 
 The library snapshot includes `runningGameIds` from the in-memory launch guard, covering both pending starts and directly launched processes. Library-change events publish reservations, launch failures and process exits. Play stays disabled across the hero, details, cards, list and context menu until the tracked process exits or its start fails; a failed library refresh after a successful start retains the disabled state. Running status is transient and is not stored as an installation flag or restored from stale sessions.
 
@@ -63,6 +67,71 @@ Local Steam manifests add 50. Verified game payloads add 70, allowing small real
 The first meaningful directory under a configured library root identifies an installation; generic `bin/x64/Game/Binaries` and Steam/Riot/Bethesda library-container components are skipped. The best candidate wins per installation; loose EXEs at the configured root retain separate identities. A verified payload also recognizes an exact game folder selected as a scan root. Metadata matching cannot by itself turn a blacklisted helper into a game. Artwork service availability never determines whether a local game is imported.
 
 This is a heuristic, not a universal detector. Deep publisher collections, games with generic Unity metadata and unusual launcher-only titles may need adjustment. General emulators, ROM libraries and store imports remain deferred; the specific shadPS4 integration below is supported.
+
+## Steam launching
+
+An executable beneath `steamapps/common/<installation>` is matched to a bounded
+`appmanifest_<id>.acf` read using direct AppState fields. The numeric App ID must
+match the filename and the installation directory. Nested binaries and existing
+library records work without a rescan. Rating, artwork and SDK-file IDs never
+select a launch target. Verified installations run Steam's registered `steam.exe`
+with separate `-applaunch` / App ID arguments, preserving Steam's launch settings,
+bootstrap and anti-cheat route. A missing Steam client produces an error.
+
+Arc waits up to three minutes for Steam's per-app `Running` registry flag before
+recording a session. It then observes that flag, allowing a three-second launcher
+handoff gap. Cancellation/timeouts create no play history. The command process's
+lifetime is not counted and Arc never kills the shared Steam client. Standalone
+and console sessions continue to track the directly launched process.
+
+## Other store launching
+
+Steam identity has priority, including games that also need EA, Ubisoft or Rockstar.
+For other native installations, Arc matches the selected executable to canonical
+installation roots, then routes through the owning client. Existing records work
+without a rescan or database migration; edited titles and artwork/rating IDs do not
+select launch targets. The deepest matching root wins and conflicting identities
+at the same root produce an error.
+
+| Client | Local installation identity | Launch route |
+| --- | --- | --- |
+| Epic Games | ProgramData `.item` manifests, `LauncherInstalled.dat`, or local `.egstore/*.mancpn` | Encoded catalogue/app launch URI |
+| Riot Client | Product settings YAML plus `RiotClientInstalls.json` | Separate product and patchline arguments for LoL, VALORANT, Runeterra and 2XKO |
+| EA App | EA/Origin or uninstall registry installation and its own `__Installer/installerdata.xml` content IDs | `origin2` launch URI with validated offer IDs |
+| Ubisoft Connect | Numeric launcher installation registry ID and directory | `uplay` launch URI |
+| Battle.net | Agent `product.db` or Blizzard uninstall record | Agent internal ID mapped to the client's launch code |
+| Rockstar Games | Standalone registered install folder or Rockstar uninstall record | `-launchTitleInFolder` and one installation-path argument |
+| GOG Galaxy | Base-game registry ID, executable and install path | Galaxy autostart/game ID/runGame arguments; native fallback when Galaxy is absent |
+| NTTGame | Knight Online's executable and its sibling installed `Launcher.exe` | The game's own launcher |
+
+Launcher executable paths come from registered protocol handlers, Riot's association
+map or Galaxy's installation registry. Only the expected client executable is accepted;
+handler argument text is never evaluated or forwarded. Reads are local and bounded,
+with no store account APIs, login automation or registration writes.
+
+Fortnite can retain its game-local binary Epic manifest while its global registration
+is missing. Arc verifies its BuildPatch header, compressed length, SHA-1 payload checksum,
+known `FortniteReleaseBuilds` identity and contained bootstrapper before using the
+`Fortnite` catalogue alias. This does not repair Epic's own library registration or
+establish that Epic can launch that installation. Other binary manifest names and
+unknown Battle.net branches are not guessed as another product.
+
+For these clients, Arc waits up to three minutes for a game image in the matched
+installation before writing play history. Windows Toolhelp/process-image queries
+exclude shared clients, bootstrap wrappers, crash handlers, setup programs and anti-cheat helpers. A
+ten-second absence tolerance covers bootstrap handoffs; an open shared launcher
+does not extend the session. A missing client or start timeout produces an error,
+and Arc never kills a shared store client.
+
+Command/record formats were checked against primary implementations:
+[Epic](https://github.com/JosefNemec/PlayniteExtensions/blob/master/source/Libraries/EpicLibrary/EpicLauncher.cs),
+[Riot](https://github.com/ASchoe311/RiotGamesLibrary/blob/master/RiotGamesLibrary.cs),
+[EA content IDs](https://github.com/lutris/lutris/blob/master/lutris/services/ea_app.py),
+[Ubisoft](https://github.com/JosefNemec/PlayniteExtensions/blob/master/source/Libraries/UplayLibrary/Uplay.cs),
+[Battle.net](https://github.com/JosefNemec/PlayniteExtensions/blob/master/source/Libraries/BattleNetLibrary/BattleNetGameController.cs),
+[Rockstar](https://github.com/JosefNemec/PlayniteExtensions/blob/master/source/Libraries/RockstarLibrary/RockstarGamesController.cs),
+[GOG](https://github.com/JosefNemec/PlayniteExtensions/blob/master/source/Libraries/GogLibrary/GogLibrary.cs),
+and [Epic binary manifests](https://github.com/derrod/legendary/blob/master/legendary/models/manifest.py).
 
 ## PS4 / shadPS4
 
@@ -82,7 +151,13 @@ Three readings remain distinct: Metacritic critics /100, Metacritic players /10,
 
 Title matching rejects mismatched sequels, remakes, DLC and ambiguous exact matches. Complete/GOTY retail edition aliases are supported, with exact names preferred. For installed native games, an unambiguous numeric Steam App ID can be read from a small allowlist of existing SDK/config identity files beside the executable or in the game root, including `steam_appid.txt`. Reads stay within the canonical game folder and are capped at 64 KiB. Those files are not modified or uploaded; only the ID is sent to Steam, whose embedded app identity is verified. A linked artwork catalogue can supply a canonical name when title lookup fails; this preserves release identity without blindly dropping “remake/remastered”. Users can correct a match with a Steam URL/App ID in the detail view. The verified ID persists with its ratings and is reused on refresh.
 
-Schema 3 adds `ratings_cache` (CriticPeek's source/title aliases) and `game_ratings` (one typed payload per game, bound to current title and PC/PS4 platform). Rename/platform changes stop displaying old matches; game removal cascades its rating record. The original game fields, detector confidence, preferences, encrypted artwork key, exclusions and play history are untouched. Rating records are read with the startup snapshot. Due/missing ratings load sequentially in the background, with detail games prioritized between jobs. Hidden games are excluded. Scores have a seven-day TTL, empty matches one hour, failures without readings one minute. A failed refresh keeps verified prior readings with their original age; manual refresh remains available.
+Schema 3 adds `ratings_cache` (CriticPeek's source/title aliases) and `game_ratings` (one typed payload per game, bound to current title and PC/PS4 platform). Rename/platform changes stop displaying old matches; game removal cascades its rating record. The original game fields, detector confidence, preferences, encrypted artwork key, exclusions and play history are untouched. Rating records are read with the startup snapshot. Due/missing ratings load sequentially in the background, with detail games prioritized between jobs. Hidden games are excluded. Scores have a **72-hour TTL** in both the per-game snapshot and the provider cache; older seven-day expiry fields do not extend that lifetime. Empty matches retain a one-hour TTL and failures without readings one minute. A failed refresh keeps verified prior readings with their original age; failed checks that retain expired readings retry after 15 minutes. Manual refresh remains immediate.
+
+The rating scheduler wakes at the next due game rather than checking only once per
+app session. It also rechecks deadlines on focus, visibility restoration and network
+reconnection so suspended timers do not delay overdue scores. Saved timestamp changes
+reschedule the next check, including manual refreshes. There is no background service:
+when Arc is closed, due ratings refresh on its next launch.
 
 Rust accepts only HTTPS Steam search/details/review endpoints and Metacritic game/review paths. Credentials, custom ports, unrelated hosts/paths and unsafe redirects are rejected. Provider replies are limited to 8 MiB with a 20-second timeout. 403/429 responses are not bypassed; the reused service honors cooldowns and reports partial availability. Rating storage commands only access dedicated `score:v2:` keys/tables, not preferences or secrets. The only data providers are Steam and Metacritic; an optional canonical-title fallback uses the already configured SteamGridDB credential in Rust. No extension profile, developer backend, analytics or account is required.
 

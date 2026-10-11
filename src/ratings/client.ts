@@ -5,13 +5,17 @@ import type { Game, GameRatings } from '../types';
 
 export const ratingPlatform = (game: Game) => game.consoleLaunch ? 'playstation-4' : 'pc';
 export const ratingIdentity = (game: Game) => `${game.id}:${ratingPlatform(game)}:${game.title}`;
+export const RATINGS_TTL_MS = 72 * 60 * 60 * 1000;
 export function hasRatings(value?: GameRatings | null): boolean {
   return !!value && value.status === 'ok' && (value.metacritic?.score != null || value.metacritic?.userScore != null || !!value.steam);
 }
 export function ratingsDue(value?: GameRatings | null, now = Date.now()): boolean {
   if (!value) return true;
-  const ttl = hasRatings(value) ? 7 * 86400000 : value.errors.length ? 60000 : 3600000;
-  return value.checkedAt + ttl <= now;
+  return ratingsExpireAt(value) <= now;
+}
+export function ratingsExpireAt(value: GameRatings): number {
+  const ttl = hasRatings(value) ? RATINGS_TTL_MS : value.errors.length ? 60000 : 3600000;
+  return value.checkedAt + ttl;
 }
 // Failed refreshes retain the original readings and their age for offline use.
 export function retainRatings(previous: GameRatings | null | undefined, value: GameRatings): GameRatings {
@@ -40,8 +44,8 @@ const nativeFetch: typeof fetch = async (input, init) => {
   return response;
 };
 const services = new Map<string, ReturnType<typeof CriticScoresService.createService>>();
-const inFlight = new Map<string, Promise<void>>();
-export function loadRatings(game: Game, force = false, appId?: number): Promise<void> {
+const inFlight = new Map<string, Promise<GameRatings>>();
+export function loadRatings(game: Game, force = false, appId?: number): Promise<GameRatings> {
   const identity = ratingIdentity(game);
   if (inFlight.has(identity)) {
     const pending = inFlight.get(identity)!;
@@ -51,7 +55,7 @@ export function loadRatings(game: Game, force = false, appId?: number): Promise<
   }
   const platform = ratingPlatform(game);
   let service = services.get(platform);
-  if (!service) { service = CriticScoresService.createService({ storage, fetchImpl: nativeFetch, platform }); services.set(platform, service); }
+  if (!service) { service = CriticScoresService.createService({ storage, fetchImpl: nativeFetch, platform, ratingTtlMs: RATINGS_TTL_MS }); services.set(platform, service); }
   const selected = service;
   const task = (async () => {
     let verifiedId = appId ?? game.ratings?.appId;
@@ -73,7 +77,9 @@ export function loadRatings(game: Game, force = false, appId?: number): Promise<
     // A supplied ID whose Steam details could not be verified must not publish
     // review numbers as if the game identity had been confirmed.
     if (value.status !== 'ok') value = { ...value, steam: null, metacritic: null };
-    await api.saveRatings(game.id, game.title, platform, retainRatings(appId !== undefined && appId !== game.ratings?.appId ? null : game.ratings, value));
+    const saved = retainRatings(appId !== undefined && appId !== game.ratings?.appId ? null : game.ratings, value);
+    await api.saveRatings(game.id, game.title, platform, saved);
+    return saved;
   })().finally(() => inFlight.delete(identity));
   inFlight.set(identity, task);
   return task;

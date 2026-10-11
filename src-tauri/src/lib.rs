@@ -4,6 +4,11 @@ mod metadata;
 mod models;
 mod ps4;
 mod launch;
+mod steam;
+mod stores;
+mod launcher_metadata;
+mod registry;
+mod processes;
 mod scanner;
 mod secrets;
 mod watcher;
@@ -25,6 +30,10 @@ pub struct AppState {
 }
 type SharedState = Arc<AppState>;
 type Result<T> = std::result::Result<T, String>;
+enum TrackedSession { Steam(steam::Session), Launcher(processes::Session) }
+impl TrackedSession {
+    fn wait(self) -> Result<()> { match self { Self::Steam(session) => session.wait(), Self::Launcher(session) => session.wait() } }
+}
 pub(crate) fn changed(app: &tauri::AppHandle) { let _ = app.emit("library-changed", ()); }
 
 #[tauri::command]
@@ -248,8 +257,15 @@ async fn launch_game(app: tauri::AppHandle, state: State<'_, SharedState>, id: i
     let launched = tauri::async_runtime::spawn_blocking(move || {
         let mut db = db::open(&shared.db_path)?; let game = db::game(&db, id)?;
         let plan = launch::plan(&game)?;
+        if plan.steam_app_id.is_some_and(steam::running) { return Err("This game is already running in Steam.".into()); }
+        if let Some(install) = &plan.tracked_directory {
+            if processes::running(install)? { return Err("This game's client or game is already running.".into()); }
+        }
         // Command::spawn uses CreateProcessW on Windows with proper argument quoting. No shell string is evaluated.
-        let mut child = std::process::Command::new(&plan.program).args(&plan.args).current_dir(&plan.directory).spawn().map_err(|error| format!("Windows could not start this game: {error}."))?;
+        let mut child = plan.command().spawn().map_err(|error| format!("Windows could not start {}: {error}.", plan.store.map_or("this game", stores::Store::name)))?;
+        let tracked_session = if let Some(id) = plan.steam_app_id { Some(TrackedSession::Steam(steam::wait_for_start(id)?)) }
+            else if let Some(install) = plan.tracked_directory { Some(TrackedSession::Launcher(processes::wait_for_start(install)?)) }
+            else { None };
         let start = models::now();
         let session: Result<i64> = (|| {
             let tx = db.transaction().map_err(|e| e.to_string())?;
@@ -259,15 +275,20 @@ async fn launch_game(app: tauri::AppHandle, state: State<'_, SharedState>, id: i
             tx.commit().map_err(|e| e.to_string())?;
             Ok(session_id)
         })();
-        if session.is_err() { let _ = child.kill(); let _ = child.wait(); }
-        Ok::<_, String>((child, session?, start))
+        if session.is_err() && tracked_session.is_none() { let _ = child.kill(); let _ = child.wait(); }
+        Ok::<_, String>((child, session?, start, tracked_session))
     }).await.map_err(|e| e.to_string()).and_then(|result| result);
     match launched {
         Err(error) => { if let Ok(mut running) = state.launching.lock() { running.remove(&id); } changed(&app); Err(error) }
-        Ok((mut child, session_id, start)) => {
+        Ok((mut child, session_id, start, tracked_session)) => {
             changed(&app);
             tauri::async_runtime::spawn_blocking(move || {
-                let ended = child.wait();
+                let ended = if let Some(session) = tracked_session {
+                    let ended = session.wait();
+                    // Reap a completed command without waiting for or killing the shared client.
+                    let _ = child.try_wait();
+                    ended
+                } else { child.wait().map(|_| ()).map_err(|error| error.to_string()) };
                 let end = models::now();
                 if let Ok(mut db) = db::open(&state.db_path) {
                     if let Ok(tx) = db.transaction() {

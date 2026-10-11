@@ -13,6 +13,7 @@ import { useRatings } from './ratings/useRatings';
 import ShaderTools from './components/ShaderTools';
 import TitleBar from './components/TitleBar';
 import type { Game, Snapshot, Sort, View } from './types';
+import { version } from '../package.json';
 
 const viewNames: Record<View, string> = { library: 'Library', favorites: 'Favorites', recent: 'Recently played', hidden: 'Hidden games' };
 
@@ -228,7 +229,7 @@ export default function App() {
               <div className="card-controls">{layout === 'list' && !game.hidden && <PlayButton game={game} launching={launching} running={snapshot.runningGameIds.includes(game.id)} onPlay={item => void launch(item)} compact />}<button className="card-menu" aria-label={`Actions for ${game.title}`} onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); menu(game, rect.right - 240, rect.bottom + 5); }}><MoreHorizontal size={20} /></button></div>
             </article>)}
           </div>}
-          <footer className="content-footer"><span>{isDesktop ? `${snapshot.settings.folders.length} game folders` : 'Preview library'}</span><button onClick={() => void scan()} disabled={scanning}><RefreshCw size={14} className={scanning ? 'spin' : ''} />{scanning ? 'Scanning…' : 'Scan folders'}</button><span className="app-version">{updatingRatings ? 'Updating ratings… · ' : ''}Arc 0.1.14</span></footer>
+          <footer className="content-footer"><span>{isDesktop ? `${snapshot.settings.folders.length} game folders` : 'Preview library'}</span><button onClick={() => void scan()} disabled={scanning}><RefreshCw size={14} className={scanning ? 'spin' : ''} />{scanning ? 'Scanning…' : 'Scan folders'}</button><span className="app-version">{updatingRatings ? 'Updating ratings… · ' : ''}Arc {version}</span></footer>
         </section>
       </div>}
     </main>

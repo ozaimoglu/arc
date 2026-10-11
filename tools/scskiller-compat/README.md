@@ -1,8 +1,8 @@
 # Arc's optional SCSKiller compatibility CLI
 
-This is a maintained patch for SCSKiller **1.2.4**, based on commit
-`7087ff653b0c799d4d9fe26a76e2e26767c0db3b`. It builds a separate
-**1.2.4-arc.2** CLI. It is not an official SCSKiller release or part of Arc's installer.
+This is a maintained patch for SCSKiller **1.2.5**, based on commit
+`bf2571af3db4d1d3c49aeb05cda170571eae0704`. It builds a separate
+**1.2.5-arc.1** CLI. It is not an official SCSKiller release or part of Arc's installer.
 
 The patch:
 
@@ -27,7 +27,16 @@ The patch:
 
 The earlier Arc localization workaround was removed: 1.2.4 handles invalid Unreal
 INI data upstream. The build runs upstream's regression for that case alongside
-the retained Arc pipeline-cache regression and manual-folder/recorder tests.
+the retained Arc pipeline-cache regression and manual-folder/recorder tests. It
+also runs synthetic application, queue, discovery and formatting regressions;
+tests requiring external game installations or a GPU are excluded. The test-only
+fixture culture uses invariant numbers to match the recorder's CSV format on
+non-English Windows. The published CLI keeps the user's normal culture.
+
+The 1.2.5 base includes upstream's ray tracing chain/progress fixes, compile
+priority changes, NVIDIA disk-size reporting and recorder compatibility with
+DXGI mods. Native warmer and recorder files come from the matching official
+1.2.5 portable archive.
 
 There are no game-name overrides, fake readiness flags, bundled game shaders or keys.
 Recording remains necessary when the game does not ship enough pipeline state.
@@ -46,14 +55,14 @@ regression tests, publishes the CLI, and verifies the official portable archive'
 SHA-256 before copying its native warmer/recorder assets. To reuse a downloaded
 archive, pass `-PortableArchive`. To choose an SDK, pass `-DotNet`.
 
-It installs under `%LOCALAPPDATA%\Programs\ArcTools\SCSKiller-1.2.4-arc.2\current`.
+It installs under `%LOCALAPPDATA%\Programs\ArcTools\SCSKiller-1.2.5-arc.1\current`.
 Choose its `cli\scskiller.exe` in **Arc Settings → SCSKiller** and save. Existing
 official installations remain separate. Arc's **Analyze again** explicitly requests
 fresh engine detection, so an older unsupported result does not persist indefinitely.
 
 This CLI package deliberately has no Velopack `.portable` marker. It keeps the
 shared `%LOCALAPPDATA%\SCSKiller` store used by previous compatibility versions,
-including settings, recordings and preparation history. The official 1.2.4 portable
+including settings, recordings and preparation history. The official 1.2.4+ portable
 package instead migrates to its own `data` folder; Arc 0.1.13 follows that folder
 after upstream's `migrated` marker is present.
 

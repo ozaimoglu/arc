@@ -10,6 +10,13 @@
 #[allow(dead_code)]
 #[path = "../src/launch.rs"] mod launch;
 #[allow(dead_code)]
+#[path = "../src/steam.rs"] mod steam;
+#[allow(dead_code)]
+#[path = "../src/stores.rs"] mod stores;
+#[path = "../src/launcher_metadata.rs"] mod launcher_metadata;
+#[allow(dead_code)]
+#[path = "../src/registry.rs"] mod registry;
+#[allow(dead_code)]
 #[path = "../src/secrets.rs"] mod secrets;
 #[allow(dead_code)]
 #[path = "../src/db.rs"] mod db;
@@ -22,7 +29,10 @@ fn main() {
         let connection = rusqlite::Connection::open_with_flags(&roots[1], rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
         let game = db::game(&connection, roots[2].parse().expect("Pass a library game ID")).unwrap();
         match launch::plan(&game) {
-            Ok(plan) => println!("{}", serde_json::json!({"title": game.title, "program": models::path_string(&plan.program), "args": plan.args, "directory": models::path_string(&plan.directory)})),
+            Ok(plan) => {
+                let command = plan.command();
+                println!("{}", serde_json::json!({"title": game.title, "program": models::path_string(&plan.program), "args": plan.args, "directory": models::path_string(&plan.directory), "steamAppId": plan.steam_app_id, "launcher": plan.store.map(|store| store.name()), "trackedDirectory": plan.tracked_directory.as_deref().map(models::path_string), "commandProgram": command.get_program().to_string_lossy(), "commandDirectory": command.get_current_dir().map(|path| path.to_string_lossy())}));
+            },
             Err(error) => { eprintln!("{error}"); std::process::exit(1); },
         }
         return;

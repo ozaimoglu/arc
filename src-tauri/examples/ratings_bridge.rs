@@ -3,6 +3,7 @@
 #[allow(dead_code)] #[path = "../src/models.rs"] mod models;
 #[allow(dead_code)] #[path = "../src/metadata.rs"] mod metadata;
 #[allow(dead_code)] #[path = "../src/scanner.rs"] mod scanner;
+#[allow(dead_code)] #[path = "../src/steam.rs"] mod steam;
 #[allow(dead_code)] #[path = "../src/ps4.rs"] mod ps4;
 #[allow(dead_code)] #[path = "../src/secrets.rs"] mod secrets;
 #[allow(dead_code)] #[path = "../src/db.rs"] mod db;

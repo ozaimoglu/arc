@@ -32,13 +32,13 @@
     };
   }
 
-  function cacheExpiry(value) {
-    // Keep any verified game with a score for seven days, including partial results.
+  function cacheExpiry(value, ratingTtlMs = CACHE_TTL) {
+    // Keep verified scores, including partial results, for the configured period.
     // Missing sources can be retried explicitly without silently fetching it again.
     const hasScore = value.status === "ok" && (value.steam || typeof value.metacritic?.score === "number" || typeof value.metacritic?.userScore === "number");
     // A verified upcoming game can return HTTP 200 but no ratings yet. Recheck
     // that empty result on a later visit instead of waiting for the full rating TTL.
-    const ttl = hasScore ? CACHE_TTL : value.errors.length ? 60000 : 3600000;
+    const ttl = hasScore ? ratingTtlMs : value.errors.length ? 60000 : 3600000;
     return value.checkedAt + ttl;
   }
 
@@ -47,8 +47,9 @@
     return entry?.checkedAt ?? entry?.expires - 180 * DAY;
   }
 
-  function createService({ storage, fetchImpl = fetch, now = Date.now, interval = 300, timeout = 20000, platform = "pc" }) {
+  function createService({ storage, fetchImpl = fetch, now = Date.now, interval = 300, timeout = 20000, platform = "pc", ratingTtlMs = CACHE_TTL }) {
     if (!["pc", "playstation-4"].includes(platform)) throw new Error("invalid-platform");
+    if (!Number.isFinite(ratingTtlMs) || ratingTtlMs <= 0) throw new Error("invalid-cache-ttl");
     const PREFIX = platform === "pc" ? "score:v2:" : "score:v2:ps4:";
     const inFlight = new Map();
     const queues = new Map();
@@ -60,12 +61,12 @@
     async function readCache(key) {
       const entry = (await storage.get(key))[key];
       if (entry?.ref) return readCache(entry.ref);
-      if (entry?.value && cacheExpiry(entry.value) > now()) return entry.value;
+      if (entry?.value && cacheExpiry(entry.value, ratingTtlMs) > now()) return entry.value;
       return null;
     }
 
     function cacheEntries(value, key, pageUrl, requestedAppId) {
-      const expires = cacheExpiry(value);
+      const expires = cacheExpiry(value, ratingTtlMs);
       const canonical = value.status === "ok" && value.appId ? `${PREFIX}app:${value.appId}` : key;
       const updates = { [canonical]: { expires, value } };
       const aliases = new Set([key]);
@@ -293,7 +294,7 @@
       const migrated = {};
       for (const [key, entry] of entries) {
         const isPageIdentity = key.startsWith(`${PREFIX}page-id:`);
-        const expires = entry?.value ? cacheExpiry(entry.value) : isPageIdentity ? pageIdentityCheckedAt(entry) + CACHE_TTL : entry?.expires;
+        const expires = entry?.value ? cacheExpiry(entry.value, ratingTtlMs) : isPageIdentity ? pageIdentityCheckedAt(entry) + CACHE_TTL : entry?.expires;
         if (!key.startsWith(PREFIX) || !(expires > now())) { obsolete.push(key); continue; }
         if (isPageIdentity) migrated[key] = { ...entry, checkedAt: pageIdentityCheckedAt(entry), expires };
         if (entry.value) {

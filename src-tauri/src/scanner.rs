@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
 use walkdir::WalkDir;
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
-use crate::{metadata::{self, ExeMetadata}, models::{path_string, Candidate}, ps4};
+use crate::{metadata::{self, ExeMetadata}, models::{path_string, Candidate}, ps4, steam};
 
 const BLACKLIST: &[&str] = &["unins", "uninstall", "setup", "install", "vc_redist", "vcredist", "dxsetup", "unitycrashhandler", "crashreport", "crashhandler", "crashpad", "easyanticheat", "eac_launcher", "beservice", "belauncher", "ue4prereq", "updater", "update", "redistributable", "dotnet", "msiexec", "helper", "cefsubprocess", "launcher", "reporter", "service", "benchmark", "config", "diagnostic", "gamesessionmonitor", "blizzardbrowser", "crs-handler", "crs-uploader", "crs-video", "x360ce", "vconsole", "leagueclientux", "riotclient", "battle.net", "winmtr", "ucsvc", "iigw_server", "tslgame_be", "tslgame_zk", "csgo_legacy_app"];
 const GENERIC: &[&str] = &["bin", "bin64", "binaries", "win64", "win32", "x64", "x86", "x64 dx12", "game", "games", "content", "engine", "shipping", "ship", "release", "debug", "app", "apps", "live", "installed games", "steam", "steamapps", "common", "steam library", "steam libraries", "riot games", "epic games", "epicgames", "gog games", "goggames", "ubisoft games", "battle net", "bethesda net launcher"];
@@ -95,27 +95,6 @@ fn title_and_folder(path: &Path, root: &Path, metadata: &ExeMetadata, game_asset
     (title, folder)
 }
 
-fn manifest_field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
-    let parts: Vec<_> = text.split('"').collect();
-    parts.windows(3).find(|parts| parts[0] == key && parts[1].trim().is_empty()).map(|parts| parts[2])
-}
-
-fn steam_title(folder: &Path) -> Option<String> {
-    let common = folder.parent()?;
-    if !common.file_name()?.to_string_lossy().eq_ignore_ascii_case("common") { return None; }
-    let steamapps = common.parent()?;
-    if !steamapps.file_name()?.to_string_lossy().eq_ignore_ascii_case("steamapps") { return None; }
-    let directory = folder.file_name()?.to_string_lossy();
-    for entry in std::fs::read_dir(steamapps).ok()?.flatten() {
-        let name = entry.file_name().to_string_lossy().to_lowercase();
-        if !name.starts_with("appmanifest_") || !name.ends_with(".acf") || entry.metadata().ok().is_none_or(|meta| meta.len() > 128 * 1024) { continue; }
-        let Ok(text) = std::fs::read_to_string(entry.path()) else { continue; };
-        if manifest_field(&text, "installdir").is_some_and(|value| value.eq_ignore_ascii_case(&directory)) {
-            return manifest_field(&text, "name").map(clean_title).filter(|name| useful(name));
-        }
-    }
-    None
-}
 pub fn score(name: &str, size: u64, title: &str, folder_named: bool, metadata: &ExeMetadata) -> i32 {
     let support = [metadata.product_name.as_deref(), metadata.description.as_deref()].into_iter().flatten().any(|value| {
         let value = normalize(value);
@@ -179,7 +158,7 @@ fn has_game_assets(path: &Path) -> bool {
 
 pub fn scan(folders: &[String]) -> (Vec<Candidate>, usize, Vec<String>) {
     let mut candidates: HashMap<String, Candidate> = HashMap::new(); let mut ignored = 0; let mut warnings = vec![];
-    let mut steam_names: HashMap<PathBuf, Option<String>> = HashMap::new();
+    let mut steam_installs: HashMap<PathBuf, Option<steam::Installation>> = HashMap::new();
     for folder in folders {
         let root = match std::fs::canonicalize(folder) { Ok(root) if root.is_dir() => root, _ => { warnings.push(format!("Folder unavailable: {folder}.")); continue; } };
         let mut failed = 0;
@@ -205,10 +184,10 @@ pub fn scan(folders: &[String]) -> (Vec<Candidate>, usize, Vec<String>) {
             let size = match entry.metadata() { Ok(data) => data.len(), Err(_) => { failed += 1; continue; } };
             let metadata = metadata::read(path);
             let game_assets = has_game_assets(path);
-            let (mut title, folder) = title_and_folder(path, &root, &metadata, game_assets);
-            let registered = steam_names.entry(folder.clone()).or_insert_with(|| steam_title(&folder));
-            if let Some(name) = registered { title = name.clone(); }
-            let named_installation = folder != root || (game_assets && useful(&folder.file_name().unwrap_or_default().to_string_lossy()));
+            let (mut title, mut folder) = title_and_folder(path, &root, &metadata, game_assets);
+            let registered = steam::installation_root(path).and_then(|install| steam_installs.entry(install).or_insert_with(|| steam::installation(path)).as_ref());
+            if let Some(install) = registered { title = clean_title(&install.name); folder = install.directory.clone(); }
+            let named_installation = registered.is_some() || folder != root || (game_assets && useful(&folder.file_name().unwrap_or_default().to_string_lossy()));
             let mut points = score(&name, size, &title, named_installation, &metadata);
             if registered.is_some() { points += 50; }
             if game_assets { points += 70; }
@@ -369,7 +348,7 @@ mod tests {
         for (id, directory, title, exe) in [(1, "Counter-Strike Global Offensive", "Counter-Strike 2", "cs2.exe"), (2, "MARVEL SNAP", "MARVEL SNAP", "SNAP.exe")] {
             let folder = apps.join("common").join(directory); std::fs::create_dir_all(&folder).unwrap();
             std::fs::File::create(folder.join(exe)).unwrap().set_len(600_000).unwrap();
-            std::fs::write(apps.join(format!("appmanifest_{id}.acf")), format!("\"AppState\"\n{{\n\"name\" \"{title}\"\n\"installdir\" \"{directory}\"\n}}" )).unwrap();
+            std::fs::write(apps.join(format!("appmanifest_{id}.acf")), format!("\"AppState\"\n{{\n\"appid\" \"{id}\"\n\"name\" \"{title}\"\n\"installdir\" \"{directory}\"\n}}" )).unwrap();
         }
         let (games, _, warnings) = scan(&[path_string(&root)]); std::fs::remove_dir_all(&root).unwrap();
         assert_eq!(games.len(), 2); assert!(warnings.is_empty());
@@ -387,6 +366,21 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
         assert_eq!(games.len(), 3); assert!(ignored >= 2); assert!(warnings.is_empty());
         assert!(games.iter().any(|game| game.title == "Alpha")); assert!(games.iter().any(|game| game.title == "Beta"));
+    }
+    #[test] fn steam_game_and_binary_scan_roots_keep_the_install_identity() {
+        let root = std::env::temp_dir().join(format!("arc-steam-root-{}-{}", std::process::id(), crate::models::now()));
+        let apps = root.join("SteamLibrary/steamapps");
+        let install = apps.join("common/AION2"); let binaries = install.join("Aion2/Binaries/Win64");
+        std::fs::create_dir_all(&binaries).unwrap();
+        std::fs::File::create(binaries.join("AION2.exe")).unwrap().set_len(600_000).unwrap();
+        std::fs::write(apps.join("appmanifest_3393110.acf"), "\"AppState\" { \"appid\" \"3393110\" \"name\" \"AION 2\" \"installdir\" \"AION2\" }").unwrap();
+        for folder in [&install, &binaries] {
+            let (games, _, warnings) = scan(&[path_string(folder)]);
+            assert!(warnings.is_empty()); assert_eq!(games.len(), 1);
+            assert_eq!(games[0].title, "AION 2");
+            assert_eq!(games[0].folder, path_string(&std::fs::canonicalize(&install).unwrap()));
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test] fn ps4_base_games_are_imported_once_and_emulators_are_not_native_games() {
         let root = assets_fixture("ps4");

@@ -1,6 +1,12 @@
 # Shader preparation with SCSKiller
 
-Arc 0.1.14 can analyze and compile shaders through the **SCSKiller CLI**. It supports official SCSKiller **1.2.4**, older 1.2.3 installations and the optional **1.2.4-arc.2 compatibility CLI**. SCSKiller remains an external installation; its binaries are not bundled in Arc's installer. The separately licensed patch and reproducible build instructions live in [tools/scskiller-compat](../tools/scskiller-compat/README.md).
+Arc can analyze and compile shaders through the **SCSKiller CLI**. It supports official SCSKiller **1.2.5**, older 1.2.3/1.2.4 installations and the optional **1.2.5-arc.1 compatibility CLI**. SCSKiller remains an external installation; its binaries are not bundled in Arc's installer. The separately licensed patch and reproducible build instructions live in [tools/scskiller-compat](../tools/scskiller-compat/README.md).
+
+The 1.2.5 update fixes long ray tracing chain restarts, compiles stuck near 100%,
+background analysis competing with compilation and recorder crashes with DXGI
+mods. Arc's compatibility build uses both the 1.2.5 CLI/core and matching official
+native warmer/recorder files, while retaining the shared SCSKiller data store and
+Arc's pipeline-cache, streaming-index and recording-preparation patches.
 
 ## Connect
 
