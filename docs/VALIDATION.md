@@ -40,6 +40,12 @@ non-English Windows, without changing the published CLI's culture. Upstream
 compiler/analyzer warnings remain. The official 1.2.5 portable SHA-256 was
 verified, and installed CLI/native/license assets match the validated build.
 
+Upstream subsequently replaced v1.2.5's release history. The build recipe now pins
+the reachable `b10c1e38be5901330c7af39c026d03d660db6883` commit; both commits have
+the identical complete Git tree `e27cb1acfc09c922a4e9f647be8ab74092bed3bc`.
+The portable asset's SHA-256 is unchanged. This fixes fresh CI checkouts without
+changing the tested or installed tool's source files.
+
 Arc's opt-in read-only native cache adapter test passed against the new CLI on
 the RTX 4090. It reported up to 53 GB on disk and retained the 100 GB driver limit.
 No GPU warm, cache cleanup, driver-setting mutation or game launch was performed

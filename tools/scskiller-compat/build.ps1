@@ -5,7 +5,7 @@ param(
     [switch]$Install
 )
 $ErrorActionPreference = 'Stop'
-$base = 'bf2571af3db4d1d3c49aeb05cda170571eae0704'
+$base = 'b10c1e38be5901330c7af39c026d03d660db6883'
 $version = '1.2.5-arc.1'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $work = Join-Path $repo ('.tools/scskiller-build-' + [Guid]::NewGuid().ToString('N'))

@@ -1,8 +1,13 @@
 # Arc's optional SCSKiller compatibility CLI
 
 This is a maintained patch for SCSKiller **1.2.5**, based on commit
-`bf2571af3db4d1d3c49aeb05cda170571eae0704`. It builds a separate
+`b10c1e38be5901330c7af39c026d03d660db6883`. It builds a separate
 **1.2.5-arc.1** CLI. It is not an official SCSKiller release or part of Arc's installer.
+
+Upstream replaced the v1.2.5 release history after the initial Arc build. This pin
+is reachable in the current upstream repository and has the same complete Git tree
+(`e27cb1acfc09c922a4e9f647be8ab74092bed3bc`) as the original
+`bf2571af3db4d1d3c49aeb05cda170571eae0704` base; no source files changed.
 
 The patch:
 
